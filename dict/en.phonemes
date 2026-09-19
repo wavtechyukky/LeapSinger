@@ -6,11 +6,10 @@
 #
 # 範囲は Synthesizer V の english-arpabet-phones.txt に合わせた 45 音素 + pau = 46。
 # 我々の旧 39 音素（CMUdict 標準）は SynthV の完全な部分集合だったので、
-# 不足していた 6 つ（ax dx q dr tr cl）を末尾に足してある。OpenUtau の
-# en-xsampa.template.yaml も ax/dx/q/dr/tr を持つ（en/el/em はどちらにも無い）。
+# 不足していた 6 つ（ax dx q dr tr cl）を末尾に足してある。
 #
 # NUS-48E は 39 音素しか使わないので、末尾 6 つはそのコーパスでは出現しない。
-# 他のコーパス（SynthV 系のラベル、OpenUtau 音源など）を読むときに効く。
+# 他のコーパス（SynthV 系のラベルなど）を読むときに効く。
 #
 # LeapSinger/dict/en.phonemes と **バイト同一** に保つこと
 # （音響モデルと F0 モデルの音素セット仕様）。
@@ -61,7 +60,7 @@ z
 zh                  # NUS-48E では 5 件のみ
 
 # ── ここから先は 2026-09-19 に追加（既存 id を動かさないため末尾に置く）──────
-# Synthesizer V / OpenUtau の双方が持つ拡張記号。NUS-48E には出現しない。
+# NUS-48E には出現しない拡張記号。
 ax                  # シュワー（弱母音）。母音なので dict/en.yaml の nucleus/vowels にも入る
 dx                  # 弾き音（butter の tt）
 q                   # 声門閉鎖
