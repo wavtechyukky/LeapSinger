@@ -24,7 +24,22 @@ SOFTWARE.
 NOTICE — scope of this license
 
 The MIT license above covers the LeapSinger **source code** only. It does NOT
-cover the following, which have their own separate terms:
+cover the following, which have their own separate terms. `THIRD_PARTY_NOTICES.md`
+gives the details for each.
+
+  - `preprocess/algorithms/rmvpe.py`. That one source file is a vendored and
+    modified copy of RMVPE (https://github.com/Dream-High/RMVPE) and is licensed
+    under the **Apache License, Version 2.0**, whose full text is in
+    `LICENSES/Apache-2.0.txt`. The function `to_local_average_cents()` inside it
+    originates in CREPE (https://github.com/marl/crepe), whose MIT notice —
+    Copyright (c) 2018 Jong Wook Kim — is in `LICENSES/crepe-MIT.txt`.
+    The RMVPE weights (`rmvpe.pt`) are downloaded at run time and are not
+    distributed with this repository.
+
+  - The demo and sample audio (`demo/audio/*_gt.ogg`,
+    `notebooks/sample_data/*.wav`). These are excerpts of real recordings from
+    the singing databases named below, not synthesis output, and stay governed by
+    each database's terms of use.
 
   - The bundled neural vocoder ONNX files (`checkpoints/nhv_v3_2.onnx`,
     `checkpoints/nhv_v3_2x.onnx`). These come from the NHVSing project

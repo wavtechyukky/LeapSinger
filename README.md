@@ -171,7 +171,12 @@ F0の抽出にはRMVPEを使います（RMVPEはマルチプロセスで動か�
 
 ## ライセンス
 
-コードは MIT です（`LICENSE`）。ただし、同梱のボコーダー ONNX（`checkpoints/nhv_v3_2*.onnx`）、および Release で配布する学習済みモデルとその学習に使った歌声データベースは MIT の対象外で、それぞれのライセンス・規約に従います（下の謝辞、およびモデル配布物の `CREDITS.txt` を参照）。
+コードは MIT です（`LICENSE`）。ただし次のものは MIT の対象外で、それぞれのライセンス・規約に従います。対応表と詳細は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめてあります。
+
+- **`preprocess/algorithms/rmvpe.py`** — [RMVPE](https://github.com/Dream-High/RMVPE) から取り込んで改変したファイルで、このファイルだけ **Apache-2.0** です（全文 `LICENSES/Apache-2.0.txt`）。中の `to_local_average_cents()` は [CREPE](https://github.com/marl/crepe) 由来で、その MIT 表示は `LICENSES/crepe-MIT.txt` にあります。ウェイト `rmvpe.pt` は初回実行時にダウンロードするもので、本リポジトリには含みません。
+- **デモ・サンプル音声**（`demo/audio/*_gt.ogg`、`notebooks/sample_data/*.wav`） — 合成音ではなく歌声データベースの実録音の抜粋です。各データベースの規約に従います。
+- **同梱のボコーダー ONNX**（`checkpoints/nhv_v3_2*.onnx`） — [NHVSing](https://github.com/wavtechyukky/NHVSing/) の成果物です。
+- **Release で配布する学習済みモデル**とその学習に使った歌声データベース — モデル配布物の `CREDITS.txt` を参照してください。
 
 ## 謝辞
 
@@ -182,5 +187,8 @@ F0の抽出にはRMVPEを使います（RMVPEはマルチプロセスで動か�
 - 波音リツ — https://www.canon-voice.com/voicebanks/
 - Neural Homomorphic Vocoder — https://www.isca-archive.org/interspeech_2020/liu20_interspeech.html
 - dsp（zjlww） — https://github.com/zjlww/dsp
+- RMVPE（F0 抽出。本リポジトリに同梱・改変あり） — https://github.com/Dream-High/RMVPE
+- CREPE（RMVPE 経由で `to_local_average_cents()` を利用） — https://github.com/marl/crepe
+- DiffGAN-TTS（JCU 判別器の設計を参考にしました。コードは自前実装です） — https://github.com/keonlee9420/DiffGAN-TTS
 
 配布する多話者モデルには、各データベースの規約に従って上記のクレジットを表示します。夏目悠李については **歌声DB制作: アマノケイ／音声提供者: 霧野蒼太** を表示し、「夏目悠李の出力音声に関する利用規約」をモデル配布物に同梱します。

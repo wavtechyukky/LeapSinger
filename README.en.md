@@ -171,7 +171,12 @@ The bundled version is **V3.2** — the latest weights. It fixes an abrupt per-f
 
 ## License
 
-The code is MIT (`LICENSE`). However, the bundled vocoder ONNX files (`checkpoints/nhv_v3_2*.onnx`), the trained models distributed via Releases, and the singing databases used to train them are **not** covered by MIT — they follow their own licenses and terms of use (see the Acknowledgments below and `CREDITS.txt` in the model release).
+The code is MIT (`LICENSE`). The following are **not** covered by MIT and follow their own licenses and terms of use; [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) has the details.
+
+- **`preprocess/algorithms/rmvpe.py`** — a vendored and modified copy of [RMVPE](https://github.com/Dream-High/RMVPE). That one file is **Apache-2.0** (full text in `LICENSES/Apache-2.0.txt`). The `to_local_average_cents()` function inside it originates in [CREPE](https://github.com/marl/crepe); its MIT notice is in `LICENSES/crepe-MIT.txt`. The `rmvpe.pt` weights are downloaded at run time and are not distributed here.
+- **Demo and sample audio** (`demo/audio/*_gt.ogg`, `notebooks/sample_data/*.wav`) — excerpts of real recordings from the singing databases, not synthesis output. Each database's terms of use apply.
+- **The bundled vocoder ONNX files** (`checkpoints/nhv_v3_2*.onnx`) — artifacts of [NHVSing](https://github.com/wavtechyukky/NHVSing/).
+- **The trained models distributed via Releases** and the singing databases used to train them — see `CREDITS.txt` in the model release.
 
 ## Acknowledgments
 
@@ -182,5 +187,8 @@ Thanks to the datasets used to train this model, and to the related projects.
 - Namine Ritsu — https://www.canon-voice.com/voicebanks/
 - Neural Homomorphic Vocoder — https://www.isca-archive.org/interspeech_2020/liu20_interspeech.html
 - dsp (zjlww) — https://github.com/zjlww/dsp
+- RMVPE (F0 extraction; vendored and modified here) — https://github.com/Dream-High/RMVPE
+- CREPE (`to_local_average_cents()`, reached via RMVPE) — https://github.com/marl/crepe
+- DiffGAN-TTS (the JCU discriminator design; our code is our own) — https://github.com/keonlee9420/DiffGAN-TTS
 
 The distributed multi-speaker models display the credits above, following each database's terms. For Natsume Yuuri, we display **database production: アマノケイ / voice provider: 霧野蒼太**, and we bundle the "Terms of use for Natsume Yuuri's output audio" with the model distribution.
