@@ -45,6 +45,7 @@ def _open(path: str, cache: dict):
 
 class LeapSingerDataset(Dataset):
     def __init__(self, dirs, split: str = "train", eval_songs: int = 2,
+                 eval_dbs=None,
                  min_sec: float = 0.0, pitch_aug: bool = False, seed: int = 42,
                  silence: bool = True, silence_fade_sec: float = 0.05,
                  spk_map: dict | None = None, style_map: dict | None = None):
@@ -71,7 +72,14 @@ class LeapSingerDataset(Dataset):
             phrases = meta["phrases"]
             names = sorted(phrases)
             songs = sorted({_song_of(n) for n in names})
-            n_hold = min(eval_songs, max(0, len(songs) - 1))     # keep >=1 song in train
+            # eval_dbs: eval に使う DB をここに挙げた分だけに絞る opt-in。
+            # 未指定(None)なら全 DB から抜く従来どおりの挙動。1 話者あたりの曲数が少ない
+            # コーパス（NUS-48E は 4 曲）で全 DB から 1 曲ずつ抜くと eval が 25% に達し、
+            # 学習データを大きく削ってしまうため。
+            if eval_dbs is not None and os.path.basename(os.path.normpath(str(d))) not in eval_dbs:
+                n_hold = 0                                      # この DB は全曲 train へ
+            else:
+                n_hold = min(eval_songs, max(0, len(songs) - 1))  # keep >=1 song in train
             hold = set(random.Random(seed).sample(songs, n_hold)) if n_hold else set()
             shard = str(d / "shard.npz")
             for n in names:

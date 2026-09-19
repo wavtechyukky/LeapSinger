@@ -29,12 +29,18 @@ def _cents(f0: np.ndarray) -> np.ndarray:
     return 1200.0 * np.log2(np.maximum(f0, 1e-5))
 
 
-def _get_algo(sample_rate: int, hop_size: int, fmin: float, fmax: float, device: str = "cpu"):
-    """Cache one RMVPE model per (sr, hop, fmin, fmax, device) — it loads a neural net."""
-    key = (int(sample_rate), int(hop_size), float(fmin), float(fmax), str(device))
+# RMVPE の出力は 360 ビン固定でこの範囲しか取り得ない（実測）。推定レンジは
+# モデルに渡らないので、ここは「値域の宣言」であって調整ノブではない。
+RMVPE_FMIN, RMVPE_FMAX = 31.7, 2005.5
+
+
+def _get_algo(sample_rate: int, hop_size: int, device: str = "cpu"):
+    """Cache one RMVPE model per (sr, hop, device) — it loads a neural net."""
+    key = (int(sample_rate), int(hop_size), str(device))
     if key not in _ALGO_CACHE:
         _ALGO_CACHE[key] = RMVPEPitchAlgorithm(
-            sample_rate=sample_rate, hop_size=hop_size, fmin=fmin, fmax=fmax, device=device,
+            sample_rate=sample_rate, hop_size=hop_size,
+            fmin=RMVPE_FMIN, fmax=RMVPE_FMAX, device=device,
         )
     return _ALGO_CACHE[key]
 
@@ -122,8 +128,6 @@ def extract_f0_rmvpe(
     wav: np.ndarray,
     sample_rate: int,
     hop_size: int,
-    fmin: float,
-    fmax: float,
     device: str = "cpu",
     despike: bool = True,
     octave_fix: bool = False,      # opt-in: RMVPE was verified clean on the example DBs
@@ -142,7 +146,7 @@ def extract_f0_rmvpe(
     peak = np.abs(w).max()
     if peak > 1e-6:
         w = np.clip(w / peak, -1.0, 1.0)
-    algo = _get_algo(sample_rate, hop_size, fmin, fmax, device)
+    algo = _get_algo(sample_rate, hop_size, device)
     f0_raw, voiced_flag, _ = algo.extract_pitch(w)
     voiced = np.asarray(voiced_flag, bool)
     f0_raw = np.asarray(f0_raw, np.float32)

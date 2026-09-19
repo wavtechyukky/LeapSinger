@@ -52,7 +52,10 @@ class PitchAlgorithm(ABC):
 
         voiced = periodicity > 0
         pitch[~voiced] = 0.0
-        pitch[voiced] = np.clip(pitch[voiced], self.fmin, self.fmax)
+        # 推定後の [fmin, fmax] クリップは **行わない**。RMVPE の出力は 360 ビン固定
+        # （約 31.7–2005.5 Hz）で、レンジはモデルに渡らない。ここでクリップすると
+        # レンジ外の値が捨てられるのではなく境界値に張り付き、実在しない平坦な
+        # ロングトーンを作ってしまう（pyworld / praat 時代の名残）。
 
         periodicity = np.clip(periodicity, 0.0, 1.0)
         return pitch, periodicity

@@ -4,8 +4,6 @@
 name: ritsu_soft
 spk_id: 1                   # same singer as `ritsu`; the Soft tone is a *style*, not a new speaker.
 style_id: 2                # tone id (kire=0 / normal=1 / soft=2) — kept in the shard for style-aware training.
-f0_min: 150.0
-f0_max: 1000.0
 lab_unit: "100ns"
 save_wav: false            # set true to enable pitch augmentation (stores clip wav)
 

@@ -89,8 +89,6 @@ def process_file(
     out_dir: Path,
     *,
     mel: MelSpec | None = None,
-    f0_min: float = 100.0,
-    f0_max: float = 800.0,
     f0_device: str = "cpu",
     lufs_target: float = -23.0,
     save_wav: bool = False,              # also store the per-phrase clip wav (for pitch_aug)
@@ -167,7 +165,7 @@ def process_file(
         # F0 (RMVPE only; raw 0-in-unvoiced — cut_phrases fills gaps per phrase)
         f0_clip, uv_clip = extract_f0_rmvpe(
             np.clip(clip, -1.0, 1.0), sr, hop,
-            fmin=f0_min, fmax=f0_max, device=f0_device, interpolate=False)
+            device=f0_device, interpolate=False)
         f0_clip = (f0_clip[:n] if len(f0_clip) >= n
                    else np.pad(f0_clip, (0, n - len(f0_clip)))).astype(np.float32)
         uv_clip = (uv_clip[:n] if len(uv_clip) >= n

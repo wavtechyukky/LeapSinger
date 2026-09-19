@@ -66,7 +66,6 @@ def run_recipe(recipe_path: str, out_root: str = "data",
         # suggested default mapping, consumed by the trainer, not by preprocessing.
         try:
             process_file(name, paths["lab"], paths["wav"], out_dir, mel=mel,
-                         f0_min=float(r["f0_min"]), f0_max=float(r["f0_max"]),
                          save_wav=bool(r.get("save_wav", False)),
                          f0_device=r.get("f0_device", "cpu"),
                          lab_unit=lab_unit, phon_norm=phon_norm, lab_fix=lab_fix, vocab=vocab)

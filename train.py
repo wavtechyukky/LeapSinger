@@ -272,7 +272,11 @@ def main():
             spk_map.setdefault(dbname, int(rr.get("spk_id", 0)))
             style_map.setdefault(dbname, int(rr.get("style_id", 0)))
     print(f"[spk_map] {spk_map}\n[style_map] {style_map}")
+    eval_dbs = dcfg.get("eval_dbs")
+    if eval_dbs is not None and not eval_dbs:
+        raise ValueError("data.eval_dbs が空です（eval split が空になります）")
     train_ds = LeapSingerDataset(args.data_dirs, "train", eval_songs=dcfg.get("eval_songs", 2),
+                                eval_dbs=eval_dbs,
                                 min_sec=dcfg.get("min_sec", 0.3), pitch_aug=tr.get("pitch_aug", False),
                                 silence=dcfg.get("silence", True),
                                 silence_fade_sec=dcfg.get("silence_fade_sec", 0.05),
@@ -355,6 +359,7 @@ def main():
     # ── TensorBoard eval──────────────────────────────
     writer = SummaryWriter(str(out_dir))
     eval_ds = LeapSingerDataset(args.data_dirs, "eval", eval_songs=dcfg.get("eval_songs", 2),
+                                eval_dbs=eval_dbs,
                                 min_sec=dcfg.get("min_sec", 0.3),
                                 silence=dcfg.get("silence", True),
                                 silence_fade_sec=dcfg.get("silence_fade_sec", 0.05),

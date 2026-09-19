@@ -3,8 +3,6 @@
 # Output phrase names are prefixed "natsume".
 name: natsume
 spk_id: 2
-f0_min: 100.0
-f0_max: 700.0
 lab_unit: "sec"
 save_wav: false
 

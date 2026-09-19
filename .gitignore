@@ -101,3 +101,7 @@ onnxruntime_profile_*.json
 
 # Private: former base trainer, superseded by the GAN train.py
 /train_old.py
+
+# ── NUS-48E の実験一式（公開しない。PrettyPitch 側と対）───────────────────
+configs/nus12_en_uvfree.yaml
+configs/recipes/nus_*.yaml
