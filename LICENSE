@@ -27,10 +27,16 @@ The MIT license above covers the LeapSinger **source code** only. It does NOT
 cover the following, which have their own separate terms. `THIRD_PARTY_NOTICES.md`
 gives the details for each.
 
-  - `preprocess/algorithms/rmvpe.py`. That one source file is a vendored and
-    modified copy of RMVPE (https://github.com/Dream-High/RMVPE) and is licensed
-    under the **Apache License, Version 2.0**, whose full text is in
-    `LICENSES/Apache-2.0.txt`. The function `to_local_average_cents()` inside it
+  - `preprocess/algorithms/base.py` and `preprocess/algorithms/rmvpe.py`. Both
+    were taken verbatim from pitch-benchmark
+    (https://github.com/lars76/pitch-benchmark), MIT, Copyright (c) 2025 Lars
+    Nieradzik, whose notice is in `LICENSES/pitch-benchmark-MIT.txt` and must be
+    kept when redistributing. `base.py` is MIT like the rest of this repository.
+
+    `rmvpe.py` is **not**: the RMVPE model inside it
+    (https://github.com/Dream-High/RMVPE) is Apache-2.0 upstream, so that one
+    file is distributed under the **Apache License, Version 2.0**, whose full
+    text is in `LICENSES/Apache-2.0.txt`. Its `to_local_average_cents()`
     originates in CREPE (https://github.com/marl/crepe), whose MIT notice —
     Copyright (c) 2018 Jong Wook Kim — is in `LICENSES/crepe-MIT.txt`.
     The RMVPE weights (`rmvpe.pt`) are downloaded at run time and are not

@@ -1,65 +1,47 @@
-# RMVPE pitch estimator (vendored and modified).
+# RMVPE pitch estimator (vendored).
 #
 # ---- Provenance --------------------------------------------------------------
-# The model itself -- ConvBlockRes, ResEncoderBlock, ResDecoderBlock, Encoder,
-# Intermediate, Decoder, DeepUnet0, BiGRU, E2E0 and to_local_average_cents --
-# comes from RMVPE:
+# This file was taken verbatim from pitch-benchmark:
+#
+#     https://github.com/lars76/pitch-benchmark  --  algorithms/rmvpe.py
+#     The MIT License (MIT)
+#     Copyright (c) 2025 Lars Nieradzik
+#
+# Everything here is theirs -- MelSpectrogram, ConvBlockRes, ResEncoderBlock,
+# ResDecoderBlock, Encoder, Intermediate, Decoder, DeepUnet0, BiGRU, E2E0,
+# to_local_average_cents, get_model_path and RMVPEPitchAlgorithm. The full MIT
+# text is in LICENSES/pitch-benchmark-MIT.txt.
+#
+# The model they packaged comes in turn from RMVPE, which is Apache-2.0:
 #
 #     https://github.com/Dream-High/RMVPE
 #     "RMVPE: A Robust Model for Vocal Pitch Estimation in Polyphonic Music"
 #     Haojie Wei, Xueke Cao, Tangpeng Dan, Yueguo Chen
 #     https://arxiv.org/abs/2306.15412
 #
-# Upstream spreads those over src/spec.py, src/deepunet.py, src/seq.py,
-# src/model.py and src/utils.py; here they are flattened into this one module.
+# and to_local_average_cents originates one step further back, in CREPE:
 #
-# Two pieces do NOT come from that repository. They match the RMVPE integrations
-# maintained in the singing- / voice-conversion community:
-#
-#   * MelSpectrogram. Its keyshift/speed arguments do not exist upstream. This
-#     version is identical to the one carried by yxlllc/DDSP-SVC (MIT) and by
-#     openvpi/DiffSinger and openvpi/SOME (Apache-2.0).
-#   * the pad-to-a-multiple-of-32-frames step in E2E0.forward, which matches
-#     RVC (MIT, https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI),
-#     where it lives in RMVPE.mel2hidden rather than in the module.
-#
-# Everything above is Apache-2.0 or MIT. Nothing here comes from the AGPL-3.0
-# variant in so-vits-svc: that fork rewrote to_local_average_cents, and the copy
-# in this file is Dream-High's, not theirs.
+#     https://github.com/marl/crepe  --  The MIT License (MIT)
+#     Copyright (c) 2018 Jong Wook Kim
 #
 # ---- License of THIS file ----------------------------------------------------
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use
-# this file except in compliance with the License. You may obtain a copy of the
-# License in LICENSES/Apache-2.0.txt, or at
+# This file is NOT covered by the MIT license that covers the rest of this
+# repository. The RMVPE model code inside it is Apache-2.0 upstream, so the file
+# is distributed under the Apache License, Version 2.0:
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Its conditions are a superset of the MIT conditions above, so complying with it
+# while keeping the two MIT copyright notices satisfies all three upstreams.
+# Full texts: LICENSES/Apache-2.0.txt, LICENSES/pitch-benchmark-MIT.txt,
+# LICENSES/crepe-MIT.txt. See also THIRD_PARTY_NOTICES.md.
 #
 # Unless required by applicable law or agreed to in writing, software distributed
 # under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 # CONDITIONS OF ANY KIND, either express or implied.
 #
-# This file is Apache-2.0. It is NOT covered by the MIT license that covers the
-# rest of this repository. See THIRD_PARTY_NOTICES.md.
-#
 # ---- Modifications (Apache-2.0 section 4(b)) ---------------------------------
-# Modified in 2026 by wavtechyukky:
-#   * flattened the upstream modules into this single file, and dropped what
-#     inference does not need (STFT, TimbreFilter, DeepUnet, E2E, BiLSTM, and the
-#     training / evaluation code)
-#   * ResDecoderBlock.__init__ picks output_padding for strides (2, 2) and (2, 1)
-#     as well, not only (1, 2)
-#   * added DEFAULT_MODEL_URL and get_model_path(), which fetch the weights on
-#     first use
-#   * added RMVPEPitchAlgorithm, which adapts the model to this repository's
-#     ContinuousPitchAlgorithm interface
-#
-# ---- to_local_average_cents --------------------------------------------------
-# Originates in CREPE, from which RMVPE took it:
-#
-#     https://github.com/marl/crepe -- The MIT License (MIT)
-#     Copyright (c) 2018 Jong Wook Kim
-#
-# Its full text and copyright notice are in LICENSES/crepe-MIT.txt.
+# Modified in 2026 by wavtechyukky: this notice was added. The code is unchanged.
 #
 # ---- Weights -----------------------------------------------------------------
 # rmvpe.pt is NOT redistributed here. get_model_path() downloads it at run time

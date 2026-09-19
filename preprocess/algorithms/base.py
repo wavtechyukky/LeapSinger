@@ -1,3 +1,19 @@
+# Base classes for the pitch-estimation algorithms.
+#
+# Taken verbatim from pitch-benchmark:
+#
+#     https://github.com/lars76/pitch-benchmark  --  algorithms/base.py
+#     The MIT License (MIT)
+#     Copyright (c) 2025 Lars Nieradzik
+#
+# PitchAlgorithm, ContinuousPitchAlgorithm and ThresholdPitchAlgorithm are all
+# theirs. The full MIT text is in LICENSES/pitch-benchmark-MIT.txt, and the
+# copyright notice above must be kept when redistributing. See
+# THIRD_PARTY_NOTICES.md.
+#
+# Modified in 2026 by wavtechyukky: PitchAlgorithm no longer clips the estimated
+# pitch to [fmin, fmax]; see the comment at that line for why.
+
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple, Union
 

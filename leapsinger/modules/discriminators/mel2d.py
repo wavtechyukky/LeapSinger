@@ -12,7 +12,7 @@ MRD(UnivNet)との比較で、多重解像度以外に効く2点を取り込む:
   ② **周波数保持形状**: stride を**時間だけ**に掛け(横長 kernel (3,9))、freq=128 を保持。
      スペクトルの質感は周波数方向に細かいので、freq を早く潰さない。
 
-契約は jcu.py と同一 → **同じ d_loss_jcu / g_adv_fm_jcu をそのまま再利用**(JCU=cond+uncond 構造は共通):
+仕様は jcu.py と同一 → **同じ d_loss_jcu / g_adv_fm_jcu をそのまま再利用**(JCU=cond+uncond 構造は共通):
   forward(x_t, x_clean, t, cond_id) -> (cond_feats, uncond_feats)
     各 feats = 中間層出力のリスト(末尾=ロジットのパッチマップ [B,1,F,T'])
   入力 = stack([x_clean, x_t]) の2チャンネル画像 [B,2,mel,T]

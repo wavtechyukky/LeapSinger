@@ -6,9 +6,9 @@ They are listed here. If you redistribute LeapSinger, carry these notices with i
 
 | What | Where | Terms |
 |---|---|---|
-| RMVPE pitch estimator | `preprocess/algorithms/rmvpe.py` | Apache-2.0 — [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt) |
-| `to_local_average_cents()` inside that file | same file | MIT (CREPE) — [`LICENSES/crepe-MIT.txt`](LICENSES/crepe-MIT.txt) |
-| RMVPE weights `rmvpe.pt` | downloaded at run time, **not** in this repo | see below |
+| Pitch-algorithm base classes | `preprocess/algorithms/base.py` | MIT (pitch-benchmark) |
+| RMVPE pitch estimator | `preprocess/algorithms/rmvpe.py` | Apache-2.0, plus the MIT notices below |
+| RMVPE weights `rmvpe.pt` | downloaded at run time, **not** in this repo | see §3 |
 | Neural vocoder | `checkpoints/nhv_v3_2.onnx`, `checkpoints/nhv_v3_2x.onnx` | NHVSing project |
 | Demo and sample audio | `demo/audio/*_gt.ogg`, `notebooks/sample_data/*.wav` | each singing database's terms of use |
 | Acoustic-model checkpoints | GitHub Releases, **not** in this repo | each singing database's terms of use |
@@ -17,57 +17,51 @@ Everything else in this repository is our own work and is MIT.
 
 ---
 
-## 1. RMVPE — `preprocess/algorithms/rmvpe.py` (Apache-2.0)
+## 1. pitch-benchmark — `preprocess/algorithms/base.py` and `rmvpe.py` (MIT)
 
-This one file is **not** MIT. It is licensed under the Apache License, Version 2.0,
-whose full text is in [`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt).
+Both files were taken **verbatim** from
 
-The model comes from RMVPE:
+> **pitch-benchmark** — <https://github.com/lars76/pitch-benchmark>
+> The MIT License (MIT), Copyright (c) 2025 Lars Nieradzik
+
+- `preprocess/algorithms/base.py` is their `algorithms/base.py`: `PitchAlgorithm`,
+  `ContinuousPitchAlgorithm` and `ThresholdPitchAlgorithm`.
+- `preprocess/algorithms/rmvpe.py` is their `algorithms/rmvpe.py`: `MelSpectrogram`,
+  `ConvBlockRes`, `ResEncoderBlock`, `ResDecoderBlock`, `Encoder`, `Intermediate`,
+  `Decoder`, `DeepUnet0`, `BiGRU`, `E2E0`, `to_local_average_cents`, `get_model_path`
+  and `RMVPEPitchAlgorithm`.
+
+Their MIT text and copyright notice are in
+[`LICENSES/pitch-benchmark-MIT.txt`](LICENSES/pitch-benchmark-MIT.txt), and MIT requires
+that notice to travel with the code.
+
+**Our modifications**
+
+- `base.py`: `PitchAlgorithm` no longer clips the estimated pitch to `[fmin, fmax]`.
+  RMVPE never receives those bounds, so clipping pinned out-of-range frames to the
+  boundary and invented flat sustained notes rather than rejecting them.
+- `rmvpe.py`: the notice header was added. The code is unchanged.
+
+## 2. RMVPE and CREPE — inside `rmvpe.py` (Apache-2.0, MIT)
+
+The model that pitch-benchmark packaged in that file comes from
 
 > **RMVPE: A Robust Model for Vocal Pitch Estimation in Polyphonic Music**
 > Haojie Wei, Xueke Cao, Tangpeng Dan, Yueguo Chen
 > <https://arxiv.org/abs/2306.15412> — code at <https://github.com/Dream-High/RMVPE>
 
-`ConvBlockRes`, `ResEncoderBlock`, `ResDecoderBlock`, `Encoder`, `Intermediate`,
-`Decoder`, `DeepUnet0`, `BiGRU`, `E2E0` and `to_local_average_cents` are from there.
-Upstream spreads them over `src/spec.py`, `src/deepunet.py`, `src/seq.py`,
-`src/model.py` and `src/utils.py`; we flattened them into one module.
+which is **Apache-2.0**, and `to_local_average_cents()` originates one step further back
+in
 
-Two pieces do not come from that repository. They match the RMVPE integrations the
-singing- and voice-conversion community maintains:
+> **CREPE** — <https://github.com/marl/crepe>
+> The MIT License (MIT), Copyright (c) 2018 Jong Wook Kim
 
-- **`MelSpectrogram`** — its `keyshift` / `speed` arguments do not exist upstream.
-  This version is identical to the one in [yxlllc/DDSP-SVC](https://github.com/yxlllc/DDSP-SVC)
-  (MIT) and in [openvpi/DiffSinger](https://github.com/openvpi/DiffSinger) and
-  [openvpi/SOME](https://github.com/openvpi/SOME) (Apache-2.0).
-- **the pad-to-a-multiple-of-32-frames step in `E2E0.forward`** — this matches
-  [RVC](https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI) (MIT),
-  where it sits in `RMVPE.mel2hidden` rather than in the module.
-
-All of those are Apache-2.0 or MIT. Nothing here comes from the AGPL-3.0 variant in
-so-vits-svc: that fork rewrote `to_local_average_cents`, and the copy in this file is
-Dream-High's, not theirs.
-
-### Modifications (Apache-2.0 section 4(b))
-
-Modified in 2026 by wavtechyukky:
-
-- flattened the upstream modules into one file, and dropped what inference does not
-  need (`STFT`, `TimbreFilter`, `DeepUnet`, `E2E`, `BiLSTM`, training and evaluation code)
-- `ResDecoderBlock.__init__` picks `output_padding` for strides `(2, 2)` and `(2, 1)`
-  as well, not only `(1, 2)`
-- added `DEFAULT_MODEL_URL` and `get_model_path()`, which fetch the weights on first use
-- added `RMVPEPitchAlgorithm`, which adapts the model to this repository's
-  `ContinuousPitchAlgorithm` interface
-
-## 2. CREPE — `to_local_average_cents()` (MIT)
-
-RMVPE took that function from CREPE almost verbatim, so its MIT notice applies too:
-
-> The MIT License (MIT) — Copyright (c) 2018 Jong Wook Kim
-> <https://github.com/marl/crepe>
-
-Full text: [`LICENSES/crepe-MIT.txt`](LICENSES/crepe-MIT.txt).
+Because the RMVPE code is Apache-2.0 upstream, `preprocess/algorithms/rmvpe.py` is **not**
+covered by this repository's MIT license. We distribute it under the Apache License,
+Version 2.0 ([`LICENSES/Apache-2.0.txt`](LICENSES/Apache-2.0.txt)), whose conditions are a
+superset of the MIT conditions; keeping the Apache notice together with the two MIT
+copyright notices satisfies all three upstreams. CREPE's text is in
+[`LICENSES/crepe-MIT.txt`](LICENSES/crepe-MIT.txt).
 
 ## 3. RMVPE weights (`rmvpe.pt`)
 
@@ -76,8 +70,8 @@ Full text: [`LICENSES/crepe-MIT.txt`](LICENSES/crepe-MIT.txt).
     https://huggingface.co/lj1995/VoiceConversionWebUI/resolve/main/rmvpe.pt
 
 which is a third-party mirror (`lj1995` is the RVC author). The weights originate with
-the RMVPE authors. We do not restate terms for them, because the mirror states none —
-if you redistribute the weights yourself, check with the RMVPE authors first.
+the RMVPE authors. We do not restate terms for them, because the mirror states none — if
+you redistribute the weights yourself, check with the RMVPE authors first.
 
 ## 4. Neural vocoder ONNX
 
@@ -105,9 +99,10 @@ Releases; see the `CREDITS.txt` bundled with each release.
 ## Not third-party: our own implementations
 
 For the avoidance of doubt, the following are **our own code**, written from the
-published descriptions. They are MIT like the rest of the repository. We name the work
-that the design follows because we think credit is due, not because any of their code is
-present here.
+published descriptions, and were checked against the upstreams named below by comparing
+syntax trees rather than by eye. They are MIT like the rest of the repository. We name
+the work that the design follows because we think credit is due, not because any of
+their code is present here.
 
 | Our file | Design follows |
 |---|---|

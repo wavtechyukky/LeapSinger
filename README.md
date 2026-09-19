@@ -173,7 +173,8 @@ F0の抽出にはRMVPEを使います（RMVPEはマルチプロセスで動か�
 
 コードは MIT です（`LICENSE`）。ただし次のものは MIT の対象外で、それぞれのライセンス・規約に従います。対応表と詳細は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) にまとめてあります。
 
-- **`preprocess/algorithms/rmvpe.py`** — [RMVPE](https://github.com/Dream-High/RMVPE) から取り込んで改変したファイルで、このファイルだけ **Apache-2.0** です（全文 `LICENSES/Apache-2.0.txt`）。中の `to_local_average_cents()` は [CREPE](https://github.com/marl/crepe) 由来で、その MIT 表示は `LICENSES/crepe-MIT.txt` にあります。ウェイト `rmvpe.pt` は初回実行時にダウンロードするもので、本リポジトリには含みません。
+- **`preprocess/algorithms/base.py` と `preprocess/algorithms/rmvpe.py`** — どちらも [pitch-benchmark](https://github.com/lars76/pitch-benchmark)（MIT, Copyright (c) 2025 Lars Nieradzik）からそのまま取り込んだファイルです。著作権表示は `LICENSES/pitch-benchmark-MIT.txt` にあり、再配布時はこれを保持してください。`base.py` は本リポジトリと同じ MIT です。
+  `rmvpe.py` は違います。中の RMVPE モデルは [上流](https://github.com/Dream-High/RMVPE)が **Apache-2.0** なので、このファイルだけ Apache-2.0 で配布します（全文 `LICENSES/Apache-2.0.txt`）。`to_local_average_cents()` は [CREPE](https://github.com/marl/crepe) 由来で、その MIT 表示は `LICENSES/crepe-MIT.txt` にあります。ウェイト `rmvpe.pt` は初回実行時にダウンロードするもので、本リポジトリには含みません。
 - **デモ・サンプル音声**（`demo/audio/*_gt.ogg`、`notebooks/sample_data/*.wav`） — 合成音ではなく歌声データベースの実録音の抜粋です。各データベースの規約に従います。
 - **同梱のボコーダー ONNX**（`checkpoints/nhv_v3_2*.onnx`） — [NHVSing](https://github.com/wavtechyukky/NHVSing/) の成果物です。
 - **Release で配布する学習済みモデル**とその学習に使った歌声データベース — モデル配布物の `CREDITS.txt` を参照してください。
@@ -187,7 +188,8 @@ F0の抽出にはRMVPEを使います（RMVPEはマルチプロセスで動か�
 - 波音リツ — https://www.canon-voice.com/voicebanks/
 - Neural Homomorphic Vocoder — https://www.isca-archive.org/interspeech_2020/liu20_interspeech.html
 - dsp（zjlww） — https://github.com/zjlww/dsp
-- RMVPE（F0 抽出。本リポジトリに同梱・改変あり） — https://github.com/Dream-High/RMVPE
+- pitch-benchmark（Lars Nieradzik。`preprocess/algorithms/` の 2 ファイルはここからの取り込みです） — https://github.com/lars76/pitch-benchmark
+- RMVPE（F0 抽出モデル本体） — https://github.com/Dream-High/RMVPE
 - CREPE（RMVPE 経由で `to_local_average_cents()` を利用） — https://github.com/marl/crepe
 - DiffGAN-TTS（JCU 判別器の設計を参考にしました。コードは自前実装です） — https://github.com/keonlee9420/DiffGAN-TTS
 

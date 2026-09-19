@@ -13,7 +13,7 @@
 # 他のコーパス（SynthV 系のラベル、OpenUtau 音源など）を読むときに効く。
 #
 # LeapSinger/dict/en.phonemes と **バイト同一** に保つこと
-# （音響モデルと F0 モデルの音素セット契約）。
+# （音響モデルと F0 モデルの音素セット仕様）。
 
 pau                 # 0: silence / pad
 
