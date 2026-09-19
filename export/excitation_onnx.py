@@ -38,6 +38,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+
 def _harm_rms(n_harm: int, decay: float = 1.0) -> float:
     """RMS of Sum_{k=1..K}(1/k^decay)*sin(k*phi). Identical to harmonic_excitation._harm_rms."""
     return math.sqrt(sum((1.0 / k ** decay) ** 2 for k in range(1, n_harm + 1)) / 2.0)
@@ -94,6 +95,42 @@ class HarmonicNoiseExcitationONNX(nn.Module):
         mag = torch.sqrt(re ** 2 + im ** 2 + 1e-12)                                # [B, T', F]
         return mag.transpose(1, 2)                                                 # [B, F, T']
 
+    def _harm_sum(self, phase: torch.Tensor, f0_up: torch.Tensor) -> torch.Tensor:
+        """Sum_k amp_k * sin(k*phase) * antialias_k  ->  [B, n], one harmonic at a time.
+
+        The obvious form builds `[B, n_harm, n]` and reduces it. At n_harm=256 and 44.1 kHz
+        that is ~260 MB per second of audio, and several such tensors are live at once (the
+        sine, the two multiplies, the anti-alias compare and its cast), so peak memory grew
+        with the input: measured ~87 MB per second of audio, i.e. 2.55 GB for a 24-second
+        phrase. `leapsinger.modules.harmonic_excitation` avoids this in torch by fusing under
+        torch.compile, or by falling back to its own `_harm_sum_loop`; neither survives the
+        export, because ORT does not fuse an elementwise chain into a reduction.
+
+        Accumulating into `[B, n]` keeps the peak at O(n) regardless of n_harm. The loop is a
+        plain Python loop on purpose: `n_harm` is a build-time constant, so tracing unrolls it into
+        n_harm straight-line blocks and **never materialises `[B, n_harm, n]`**. That works
+        under the legacy exporter, which is what this module must keep using — OpenUTAU ships
+        an older ONNX Runtime, hence `dynamo=False` in export/cli.py, and the ONNX `Scan` that
+        a dynamic loop would need is not available there.
+
+        The trip count is unrolled, not dynamic, but `n_harm` is fixed at construction, so
+        nothing about the input length is baked in.
+
+        Sequential accumulation does not reproduce `torch.sum`'s pairwise order bit for bit:
+        measured -132 dB on the excitation waveform at n_harm=256 (-136 dB at 50), constant
+        from 2.3 s to 23.2 s. That is float32 rounding, 36 dB below 16-bit quantization noise.
+        """
+        dt = phase.dtype
+        nyq = float(self.nyq)
+        decay = float(self.harm_decay)
+        acc = torch.zeros_like(phase)
+        for i in range(int(self.n_harm)):
+            k = float(i + 1)                          # Python の即値 = グラフ上は定数
+            a = 1.0 / k ** decay
+            aa = (k * f0_up < nyq).to(dt)             # [B, n] anti-alias gate
+            acc = acc + a * torch.sin(k * phase) * aa
+        return acc
+
     def forward(self, f0_logf0: torch.Tensor, voiced: torch.Tensor) -> torch.Tensor:
         """f0_logf0 [B,T] (log2 Hz, CONTINUOUS/gap-less), voiced [B,T] (1=voiced) -> ln-mel [B,n_mels,T].
         For the uv-free / DiffSinger path `voiced` is all-ones; for the optional path it is the
@@ -116,10 +153,7 @@ class HarmonicNoiseExcitationONNX(nn.Module):
         # the float64 accumulation costs nothing in the fp16 conversion.
         phase = torch.cumsum((2.0 * math.pi * f0_up / self.sr).to(torch.float64), dim=1)
         phase = phase.to(f0_logf0.dtype)                                           # back to float32
-        f0_up3 = f0_up.unsqueeze(1)                                                # [B,1,n]
-        kf = self.harm_k * f0_up3                                                  # [B,K,n]
-        aa = (kf < self.nyq).to(f0_logf0.dtype)                                    # anti-alias gate
-        harm = torch.sum(self.harm_amp * torch.sin(self.harm_k * phase.unsqueeze(1)) * aa, dim=1)
+        harm = self._harm_sum(phase, f0_up)                                        # [B, n]
         harm = (harm / self.harm_rms) * v_up                                       # unit-RMS + voiced gate
         noise = torch.zeros_like(harm) if self.deterministic else torch.randn_like(harm)
         exc = self.scale * (harm + self.noise_ratio * noise)                       # [B, n]
