@@ -43,17 +43,17 @@ RTF per acoustic model, comparing Python native vs. ONNX across core counts:
 
 | Cores | Python native | ONNX |
 |:--:|--:|--:|
-| 1 | 0.027 | 0.090 |
-| 2 | 0.026 | 0.063 |
-| 4 | 0.027 | 0.058 |
-| 8 | 0.026 | 0.054 |
-| 10 | 0.024 | 0.065 |
+| 1 | 0.023 | 0.066 |
+| 2 | 0.021 | 0.047 |
+| 4 | 0.020 | 0.042 |
+| 8 | 0.021 | 0.060 |
+| 10 | 0.021 | 0.062 |
 
-- **Python native** is a single step, so it barely depends on core count. Even on one core the RTF is 0.027 (about 37× faster than real time).
-- **ONNX** is a few times slower than native because of onnxruntime overhead, but it is still more than 10× faster than real time. 4–8 cores are fastest; using all cores (10) is actually slower.
+- **Python native** is a single step, so it barely depends on core count. Even on one core the RTF is 0.023 (about 43× faster than real time).
+- **ONNX** is a few times slower than native because of onnxruntime overhead, but it is still more than 15× faster than real time. 4 cores are fastest; 8 or more is actually slower, because the excitation sums its harmonics one at a time — which is what keeps memory independent of the input length — and that sum does not parallelise across cores.
 - **The NHVSing vocoder** runs at RTF under 0.1 on CPU (see the NHVSing repository for details).
 
-(Measured on Apple Silicon, 10 cores, onnxruntime CPU, a ~7-second phrase, median. Results vary by machine.)
+(Measured on Apple Silicon, 10 cores, onnxruntime CPU, a real 7.0-second phrase, median of 9 runs. The ONNX build is `export/cli.py` with its defaults, `--variant diffsinger --hop 512`. Results vary by machine.)
 
 The frame settings are 44.1 kHz and hop size 256. Hop size 512 is handled by averaging each pair of adjacent frames.
 
