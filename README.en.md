@@ -18,6 +18,26 @@ LeapSinger is a diffusion-style **acoustic model** for singing voice. It runs ve
 - **Evaluation tools** (`tools/eval_ab.py`, `tools/render_ab.py`) and `tests/`.
 - v0.1.0 checkpoints and preprocessed data still work ([Compatibility](#compatibility)).
 
+#### V1 vs V2 on the 71 held-out phrases
+
+An excerpt of `tools/eval_ab.py` on the v0.1.0 model (V1) and the V2 student, over 71 phrases from songs never seen in training (synthesised in one step from the true phoneme durations and F0). Ratios are generated / recording, so 1 means "like the recording"; per-band values are 68 Hz–945 Hz / 973 Hz–2.4 kHz / 2.5–6.1 kHz / 6.3–15.5 kHz. Bold = closer to the recording (ratios closer to 1, offsets closer to 0, error lower).
+
+| Metric | V1 | V2 |
+|---|---|---|
+| Fine time texture (per band) | 0.86 / 0.91 / 0.94 / 0.92 | **0.92 / 0.95 / 0.99 / 1.01** |
+| Spectral-shape peaks and valleys, consonants (per band) | 0.95 / 0.86 / 0.73 / 0.72 | **1.04 / 0.96 / 0.88 / 0.93** |
+| Spectral-shape peaks and valleys, vowels (per band) | **0.99** / 0.97 / 0.86 / 0.78 | 1.02 / **1.01** / **0.90** / **0.87** |
+| Motion at the phoneme rate, 30–150 ms, vowels (per band) | 0.93 / 0.95 / 0.92 / 0.87 | **0.98 / 0.99 / 0.99 / 0.98** |
+| Harmonic peak roughness, < 1 kHz / 1–3 kHz (above 1 = jagged) | 1.57 / 1.34 | **1.20 / 1.12** |
+| Harmonic valley level vs recording (+ = valleys filled in) | +0.7 / +0.7 dB | **−0.6 / −0.5 dB** |
+| Regular (GAN-like) pattern, largest excess (per band) | 2.8 / 2.4 / 2.1 / 6.3 dB | **0.7 / 1.4 / 1.7 / 2.3 dB** |
+| Steadiness inside long vowels | 0.91 | **1.03** |
+| Mel error against each model's own training target (non-silent frames) | **5.08 dB** | 5.32 dB |
+| The same after smoothing both by 21 frames × 21 bins (the coarse shape only) | 2.44 dB | **2.32 dB** |
+| Phrase-level level offset | 0.95 dB | **0.64 dB** |
+
+V2 keeps the detail that averaging tends to lose — fine time texture, the spectral shape of consonants, phoneme-rate motion — its harmonic lines are cleaner, and the regular pattern the GAN left is gone. It is not better everywhere: the plain mel error is 0.24 dB higher (the excess is random detail that does not coincide with the recording — smoothing both sides reverses the order, and the phrase-level level is closer for V2); the first and last 20 ms of phonemes are 0.13 dB worse; and the (rare) devoiced vowels are clearly worse (error 7.8 → 11.2 dB, spectral centroid 1.3 kHz low). One checkpoint each; V1's target is the raw mel and V2's the loudness-corrected mel (the ratio metrics do not depend on the target's level).
+
 ## What is LeapSinger?
 
 Most diffusion models start from random noise and paint the mel little by little over many steps. LeapSinger instead starts from a **"pseudo-mel" built from F0** (an impulse waveform plus white noise), and finishes the mel in **a single step** with a rectified flow. It skips the slow work of learning how to draw clean periodic content, and jumps straight to a high-quality mel — hence the name *LeapSinger*.

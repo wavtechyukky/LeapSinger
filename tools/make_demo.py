@@ -12,8 +12,10 @@ adds songs rendered elsewhere, and `html` builds the page from the manifests it 
         --like demo/manifest_v1.json --label V2 --release v2.0.0 --threads 2
     # 2. songs sung from scores: <wav_dir>/<speaker>/<song>.wav -> demo/audio/svs_<speaker>_<song>_<tag>.ogg
     python tools/make_demo.py scores --tag v2 --wav_dir out/svs --alias kirakiraboshi=kirakira_boshi
-    # 3. the page (the first manifest gives the phrase order, the seconds and the song titles)
-    python tools/make_demo.py html --manifests demo/manifest_v1.json demo/manifest_v2.json
+    # 3. the page (the first manifest gives the phrase order, the seconds and the song titles; the optional
+    #    comparison JSON is a small metrics table shown at the top, e.g. from tools/eval_ab.py)
+    python tools/make_demo.py html --manifests demo/manifest_v1.json demo/manifest_v2.json \\
+        --comparison demo/comparison_v1_v2.json
 
 Asset names: audio/<spk>_<phrase>_<audio_suffix>.ogg, img/<spk>_<phrase><img_suffix>_{pred,voc}.png,
 audio/svs_<spk>_<song><score_suffix>.ogg. The V1 (v0.1.0) assets keep their original names
@@ -293,6 +295,9 @@ table{border-collapse:collapse;width:100%;margin:.4em 0 1em}
 td,th{border:1px solid var(--line);padding:9px;vertical-align:top;text-align:left}
 th{font-size:.82em;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;background:var(--card)}
 td:first-child{font-family:ui-monospace,Menlo,monospace;font-size:.8em;word-break:break-all;max-width:135px}
+table.cmp{max-width:900px}
+table.cmp td:first-child{font-family:inherit;font-size:.9em;word-break:normal;max-width:none}
+table.cmp td{white-space:nowrap}
 audio{width:100%;max-width:240px;display:block}
 img.mel{width:300px;max-width:100%;border-radius:3px;display:block}
 .stack>*+*{margin-top:.35em}
@@ -365,7 +370,28 @@ def merge_phrases(mans: list) -> list:
     return out
 
 
-def build_html(mans: list) -> str:
+def _cell(v) -> str:
+    """Escape a table value; *text* marks the better value and is shown bold."""
+    return re.sub(r"\*([^*]+)\*", r"<b>\1</b>", esc(v))
+
+
+def comparison_block(cmp: dict) -> str:
+    """A small metrics table (demo/comparison_<a>_<b>.json): title, lead, columns, rows [{metric, values}], notes.
+    In the values, *text* is rendered bold (the better value)."""
+    h = [f"<h2>{esc(cmp.get('title', 'Comparison'))}</h2>"]
+    if cmp.get("lead"):
+        h.append(f'<p class="lead">{esc(cmp["lead"])}</p>')
+    h.append('<div class="tablewrap"><table class="cmp"><tr><th>metric</th>'
+             + "".join(f"<th>{esc(c)}</th>" for c in cmp.get("columns", [])) + "</tr>")
+    for r in cmp.get("rows", []):
+        h.append(f"<tr><td>{esc(r['metric'])}</td>" + "".join(f"<td>{_cell(v)}</td>" for v in r["values"]) + "</tr>")
+    h.append("</table></div>")
+    if cmp.get("notes"):
+        h.append('<ul class="versions">' + "".join(f"<li>{esc(n)}</li>" for n in cmp["notes"]) + "</ul>")
+    return "\n".join(h)
+
+
+def build_html(mans: list, comparison: dict | None = None) -> str:
     base = mans[0]
     labels = [m["label"] for m in mans]
     speakers = merge_phrases(mans)
@@ -380,6 +406,8 @@ def build_html(mans: list) -> str:
          "(harmonic-excitation rectified flow, one step) predicts a mel-spectrogram, rendered to audio by the "
          "bundled NHVSing vocoder. This page puts the released versions side by side:</p>",
          '<ul class="versions">' + "".join(f"<li>{version_line(m)}</li>" for m in mans) + "</ul>"]
+    if comparison:
+        h.append(comparison_block(comparison))
 
     # 1. copy-synthesis
     h.append("<h2>1. Copy-synthesis — ground truth vs model (3 speakers)</h2>")
@@ -466,7 +494,8 @@ def check_assets(page: str) -> list:
 
 def cmd_html(args) -> None:
     mans = [load_manifest(p) for p in args.manifests]
-    page = build_html(mans)
+    cmp = load_manifest(args.comparison) if args.comparison else None
+    page = build_html(mans, cmp)
     missing = check_assets(page)
     if missing and not args.allow_missing:
         raise SystemExit("assets missing under demo/:\n  " + "\n  ".join(missing))
@@ -515,6 +544,8 @@ def main() -> None:
 
     p = sub.add_parser("html", help="manifest からページを書く")
     p.add_argument("--manifests", nargs="+", required=True, help="並べる順。先頭が句の順と秒数と曲名の元")
+    p.add_argument("--comparison", default=None,
+                   help="冒頭に出す指標の表の JSON（例 demo/comparison_v1_v2.json: title, lead, columns, rows, notes）")
     p.add_argument("--out", default=None, help="既定 demo/index.html")
     p.add_argument("--allow_missing", action="store_true", help="無い素材があっても書く")
     p.set_defaults(fn=cmd_html)

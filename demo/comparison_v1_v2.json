@@ -1,0 +1,23 @@
+{
+ "title": "V1 vs V2 at a glance",
+ "lead": "The two models on the 71 held-out phrases (songs never seen in training), synthesised in one step from the true phoneme durations and F0 and measured with tools/eval_ab.py. Ratios are generated / recording, so 1 means \"like the recording\"; per-band values are 68 Hz–945 Hz / 973 Hz–2.4 kHz / 2.5–6.1 kHz / 6.3–15.5 kHz. Bold = closer to the recording (ratios closer to 1, offsets closer to 0, error lower).",
+ "columns": ["V1", "V2"],
+ "rows": [
+  {"metric": "Fine time texture (per band)", "values": ["0.86 / 0.91 / 0.94 / 0.92", "*0.92 / 0.95 / 0.99 / 1.01*"]},
+  {"metric": "Spectral-shape peaks and valleys, consonants (per band)", "values": ["0.95 / 0.86 / 0.73 / 0.72", "*1.04 / 0.96 / 0.88 / 0.93*"]},
+  {"metric": "Spectral-shape peaks and valleys, vowels (per band)", "values": ["*0.99* / 0.97 / 0.86 / 0.78", "1.02 / *1.01* / *0.90* / *0.87*"]},
+  {"metric": "Motion at the phoneme rate, 30–150 ms, vowels (per band)", "values": ["0.93 / 0.95 / 0.92 / 0.87", "*0.98 / 0.99 / 0.99 / 0.98*"]},
+  {"metric": "Harmonic peak roughness, < 1 kHz / 1–3 kHz (above 1 = jagged)", "values": ["1.57 / 1.34", "*1.20 / 1.12*"]},
+  {"metric": "Harmonic valley level vs recording (+ = valleys filled in)", "values": ["+0.7 / +0.7 dB", "*−0.6 / −0.5 dB*"]},
+  {"metric": "Regular (GAN-like) pattern, largest excess (per band)", "values": ["2.8 / 2.4 / 2.1 / 6.3 dB", "*0.7 / 1.4 / 1.7 / 2.3 dB*"]},
+  {"metric": "Steadiness inside long vowels", "values": ["0.91", "*1.03*"]},
+  {"metric": "Mel error against each model's own training target (non-silent frames)", "values": ["*5.08 dB*", "5.32 dB"]},
+  {"metric": "The same after smoothing both by 21 frames × 21 bins (coarse shape only)", "values": ["2.44 dB", "*2.32 dB*"]},
+  {"metric": "Phrase-level level offset", "values": ["0.95 dB", "*0.64 dB*"]}
+ ],
+ "notes": [
+  "V2 keeps the detail that averaging tends to lose — fine time texture, the spectral shape of consonants, phoneme-rate motion — its harmonic lines are cleaner, and the regular pattern the GAN left is gone.",
+  "V2 is not better everywhere: the plain mel error is 0.24 dB higher (the excess is random detail that does not coincide with the recording — smoothing both sides reverses the order, and the phrase-level level is closer for V2); the first and last 20 ms of phonemes are 0.13 dB worse, and the (rare) devoiced vowels are clearly worse (error 7.8 → 11.2 dB, spectral centroid 1.3 kHz low).",
+  "One checkpoint each; V1's target is the raw mel, V2's the loudness-corrected mel (the ratio metrics do not depend on the target's level)."
+ ]
+}

@@ -16,6 +16,9 @@ table{border-collapse:collapse;width:100%;margin:.4em 0 1em}
 td,th{border:1px solid var(--line);padding:9px;vertical-align:top;text-align:left}
 th{font-size:.82em;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;background:var(--card)}
 td:first-child{font-family:ui-monospace,Menlo,monospace;font-size:.8em;word-break:break-all;max-width:135px}
+table.cmp{max-width:900px}
+table.cmp td:first-child{font-family:inherit;font-size:.9em;word-break:normal;max-width:none}
+table.cmp td{white-space:nowrap}
 audio{width:100%;max-width:240px;display:block}
 img.mel{width:300px;max-width:100%;border-radius:3px;display:block}
 .stack>*+*{margin-top:.35em}
@@ -28,6 +31,22 @@ img.mel{width:300px;max-width:100%;border-radius:3px;display:block}
 <h1>LeapSinger — synthesis demo</h1>
 <p class="lead">A lightweight singing-voice synthesizer. The <b>multi-speaker acoustic model</b> (harmonic-excitation rectified flow, one step) predicts a mel-spectrogram, rendered to audio by the bundled NHVSing vocoder. This page puts the released versions side by side:</p>
 <ul class="versions"><li><b>V1</b> (v0.1.0) — flow + GAN, 1 step. Vocoder: NHVSing V3.2 (checkpoints/nhv_v3_2.onnx).</li><li><b>V2</b> (v2.0.0) — GAN-free rectified-flow teacher distilled into a 1-step student. Vocoder: NHVSing V3.2.1 (checkpoints/nhv_v3_2_1.onnx).</li></ul>
+<h2>V1 vs V2 at a glance</h2>
+<p class="lead">The two models on the 71 held-out phrases (songs never seen in training), synthesised in one step from the true phoneme durations and F0 and measured with tools/eval_ab.py. Ratios are generated / recording, so 1 means &quot;like the recording&quot;; per-band values are 68 Hz–945 Hz / 973 Hz–2.4 kHz / 2.5–6.1 kHz / 6.3–15.5 kHz. Bold = closer to the recording (ratios closer to 1, offsets closer to 0, error lower).</p>
+<div class="tablewrap"><table class="cmp"><tr><th>metric</th><th>V1</th><th>V2</th></tr>
+<tr><td>Fine time texture (per band)</td><td>0.86 / 0.91 / 0.94 / 0.92</td><td><b>0.92 / 0.95 / 0.99 / 1.01</b></td></tr>
+<tr><td>Spectral-shape peaks and valleys, consonants (per band)</td><td>0.95 / 0.86 / 0.73 / 0.72</td><td><b>1.04 / 0.96 / 0.88 / 0.93</b></td></tr>
+<tr><td>Spectral-shape peaks and valleys, vowels (per band)</td><td><b>0.99</b> / 0.97 / 0.86 / 0.78</td><td>1.02 / <b>1.01</b> / <b>0.90</b> / <b>0.87</b></td></tr>
+<tr><td>Motion at the phoneme rate, 30–150 ms, vowels (per band)</td><td>0.93 / 0.95 / 0.92 / 0.87</td><td><b>0.98 / 0.99 / 0.99 / 0.98</b></td></tr>
+<tr><td>Harmonic peak roughness, &lt; 1 kHz / 1–3 kHz (above 1 = jagged)</td><td>1.57 / 1.34</td><td><b>1.20 / 1.12</b></td></tr>
+<tr><td>Harmonic valley level vs recording (+ = valleys filled in)</td><td>+0.7 / +0.7 dB</td><td><b>−0.6 / −0.5 dB</b></td></tr>
+<tr><td>Regular (GAN-like) pattern, largest excess (per band)</td><td>2.8 / 2.4 / 2.1 / 6.3 dB</td><td><b>0.7 / 1.4 / 1.7 / 2.3 dB</b></td></tr>
+<tr><td>Steadiness inside long vowels</td><td>0.91</td><td><b>1.03</b></td></tr>
+<tr><td>Mel error against each model&#x27;s own training target (non-silent frames)</td><td><b>5.08 dB</b></td><td>5.32 dB</td></tr>
+<tr><td>The same after smoothing both by 21 frames × 21 bins (coarse shape only)</td><td>2.44 dB</td><td><b>2.32 dB</b></td></tr>
+<tr><td>Phrase-level level offset</td><td>0.95 dB</td><td><b>0.64 dB</b></td></tr>
+</table></div>
+<ul class="versions"><li>V2 keeps the detail that averaging tends to lose — fine time texture, the spectral shape of consonants, phoneme-rate motion — its harmonic lines are cleaner, and the regular pattern the GAN left is gone.</li><li>V2 is not better everywhere: the plain mel error is 0.24 dB higher (the excess is random detail that does not coincide with the recording — smoothing both sides reverses the order, and the phrase-level level is closer for V2); the first and last 20 ms of phonemes are 0.13 dB worse, and the (rare) devoiced vowels are clearly worse (error 7.8 → 11.2 dB, spectral centroid 1.3 kHz low).</li><li>One checkpoint each; V1&#x27;s target is the raw mel, V2&#x27;s the loudness-corrected mel (the ratio metrics do not depend on the target&#x27;s level).</li></ul>
 <h2>1. Copy-synthesis — ground truth vs model (3 speakers)</h2>
 <p class="lead">Per singer, <b>3 phrases from training songs</b> and <b>2 from held-out songs</b> (<span class="badge ev">eval</span>, never seen in training), driven by the real F0, durations and phonemes taken from each recording. Columns: the original audio, the synthesis by <b>V1</b> / <b>V2</b>, the <b>GT mel</b>, and for each version the <b>model's mel</b> (top) with the mel of the <b>vocoded output</b> (bottom). <span class="m">mel-L1 (shown for V1) is the L1 distance to the GT mel (lower = closer); it does not track perception, so judge by ear. The other versions train on a loudness-corrected target, so their distance to the raw GT is not comparable and is not shown.</span></p>
 <ul class="versions"><li><b>V2</b>: Audio is gain-matched to each recording&#x27;s RMS for listening. The V2 model sings at a constant level (its training target, −30 dB), so its own output sits a few dB below these recordings; the mel figures are at that level, the same for the model mel and the vocoded mel.</li></ul>
