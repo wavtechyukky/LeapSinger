@@ -1,0 +1,106 @@
+# Japanese three-singer model, V2 recipe — Oniku Kurumi (0) / Natsume Yuuri (1) / Namine Ritsu (2).
+# Two runs instead of flow + GAN: a GAN-free teacher that solves the flow in 16 steps, then a 1-step student
+# distilled from the teacher's pairs (reflow). The v2.0.0 release model is the student (3singer_v2_student.pt).
+# The pseudo-mel's only randomness is the excitation's white noise (noise_ratio 0.05, x0_sigma 0), so the
+# harmonics in the starting point stay clean and the student can be exported to ONNX.
+#
+#   1. Teacher (50k steps; about 3.3 h on one A100):
+#      python -m train --config configs/3singer_v2.yaml --data_dirs data/oniku data/natsume data/ritsu \
+#          --run_name 3singer_v2_teacher --out_root log --device cuda
+#   2. Student (20k steps from the teacher's weights; the pairs take about 10 min, the run about 1.5 h):
+#      python -m train --config configs/3singer_v2.yaml --data_dirs data/oniku data/natsume data/ritsu \
+#          --run_name 3singer_v2_student --out_root log --device cuda --max_updates 20000 \
+#          --set train.reflow_teacher=log/3singer_v2_teacher/ckpt_050000.pt --set train.reflow_teacher_steps=16 \
+#          --set train.num_steps=1 --set train.lr=2.0e-4
+#      RAM: the pairs (4 draws per phrase, start points kept) take about 8.5 GB plus the harmonic cache of
+#      about 4.3 GB for these three singers. The student refuses to start if its config differs from the
+#      teacher's checkpoint (only recon_weight / num_steps / flow_loss may differ).
+#   Both runs auto-resume when the same command is run again. Do not pass --init_from to the student.
+#
+# The v0.1.0 recipe (flow + GAN in one run) is configs/3speaker_gan2d.yaml.
+mel:
+  sr: 44100
+  hop: 256
+  n_fft: 2048
+  win: 2048
+  n_mels: 128
+  fmin: 40.0
+  fmax: 16000.0
+model:
+  hidden: 256
+  backbone_ch: 256
+  n_cycles: 3
+  dilation_schedule: pow2_15
+  encoder_type: attn
+  spk_dim: 32
+  n_speakers: 3
+  n_styles: 0
+  use_uv: false
+  flow_loss: l2
+  mel_vmin: -11.5
+  mel_vmax: 2.0
+  pos_cond:               # frame-level relative positions added to the condition (leapsinger/modules/position.py)
+    phoneme: true         #   0 -> 1 inside each phoneme (DiffSinger's stretch embedding), a cheap structural hint
+    encoding: sinusoidal
+    unit: false
+    bins: 8
+    nucleus: [a, i, u, e, o, A, I, U, E, O, N]
+  dur_cond: false
+excitation:
+  n_harm: 256
+  noise_ratio: 0.05       # white noise in the excitation waveform (x the harmonic RMS): the only randomness
+  exc_scale: 0.15
+  harm_decay: 1.5         # harmonic slope 1/k^decay: weaker high harmonics leave less residue in unvoiced consonants
+  x0_sigma: 0.0           # no Gaussian noise on the starting point (keeps the harmonics clean; needed for ONNX export)
+train:
+  lr: 8.0e-4              # the student overrides this with --set train.lr=2.0e-4
+  grad_clip: 1.0
+  optimizer: radam
+  lr_decay: 0.8           # x0.8 every lr_decay_steps, smoothly per step (0.41x at 20k, 0.11x at 50k)
+  lr_decay_steps: 5000
+  amp: bf16               # the encoder and the velocity network under autocast; the excitation STFT and the
+  amp_fp32_io: true       #   losses stay fp32; the network's input/output layers and residual sums stay fp32
+  max_updates: 50000      # teacher. The student runs with --max_updates 20000
+  max_batch_frames: 120000
+  max_batch_size: 64
+  min_batch_items: 16     # no tiny batches (pack longest-first, split the leftover with the previous batch)
+  recon_weight: 0.5
+  flow_loss: l2
+  cons_weight: 1.0        # consonant loss weighting off (see configs/3speaker_gan2d.yaml for the knob)
+  cons_weight_next_ms: 30
+  num_steps: 16           # the teacher solves the flow in 16 Euler steps (TensorBoard / eval_ab too).
+                          #   The student overrides this with --set train.num_steps=1
+  reflow_draws: 4         # student only (ignored until train.reflow_teacher is set): pairs per phrase
+  reflow_algorithm: euler #   how the teacher solves each pair (euler | rk2 | rk4)
+  reflow_t: zero          #   zero = the student learns only t = 0 (a 1-step model); uniform = any t
+  reflow_seed: 0
+  save_interval: 1000
+  log_interval: 50
+  eval_interval: 2000
+  eval_items: 3
+  eval_gen_metrics: true  # each eval: generate every eval phrase and log tools/eval_ab.py's metrics to eval_gen/
+  vocoder: checkpoints/nhv_v3_2_1.onnx   # TensorBoard の試聴用（hop 256）
+  num_workers: 4
+  pitch_aug: false
+  pitch_aug_semitones: [-3.0, 3.0]
+  pitch_aug_prob: 0.5
+  pitch_aug_formant_preserve: true
+  balance_speakers: true  # sample each speaker equally
+gan:
+  enabled: false          # V2: no discriminator. The teacher's 16 steps and the student's distillation replace it
+data:
+  spk_map:
+    oniku: 0
+    natsume: 1
+    ritsu: 2
+  eval_songs: 2           # songs held out per speaker for evaluation
+  min_sec: 0.3
+  max_sec: 30             # drop phrases longer than this (excluded names are printed)
+  silence: true
+  silence_fade_sec: 0.05
+  loudness_agc:           # slow AGC on the target mel (leapsinger/loudness.py); null = off.
+    sigma_sec: 1.0        #   removes loudness changes slower than ~1 s and keeps note-level and phonetic
+    target_db: -30.0      #   dynamics, so the model sings at a constant level whatever the score.
+    k: 1.0                #   Tune with tools/loudness_tuner before changing
+    max_gain_db: 12.0
+    max_cut_db: 12.0

@@ -1,4 +1,4 @@
-"""音量正規化チューナー — 前処理済みのデータセット（shard.npz + metadata.json）を選び、学習目標 mel に掛ける
+"""音量補正チューナー — 前処理済みのデータセット（shard.npz + metadata.json）を選び、学習目標 mel に掛ける
 遅い自動ゲイン（leapsinger/loudness.py、config の data.loudness_agc）のパラメータを、フレーズごとのカード
 （音量包絡・ゲイン・mel・原音/正規化音の再生）で確かめながら決める Web アプリ。
 
@@ -45,7 +45,7 @@ YAML_KEYS = ("sigma_sec", "target_db", "k", "max_gain_db", "max_cut_db")   # con
 DATA_DIRS: list[str] = []                                        # 起動時に渡されたフォルダ（画面の初期値）
 CACHE_DIR = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")) / "leapsinger" / "loudness_tuner"
 
-app = FastAPI(title="loudness tuner")
+app = FastAPI(title="loudness-correction tuner")
 
 
 # ── パラメータ ────────────────────────────────────────────────────────────────
@@ -551,7 +551,7 @@ def stats_cancel():
 
 def main():
     global DATA_DIRS, CACHE_DIR
-    ap = argparse.ArgumentParser(description="音量正規化チューナー（data.loudness_agc のパラメータを目と耳で決める）")
+    ap = argparse.ArgumentParser(description="音量補正チューナー（data.loudness_agc のパラメータを目と耳で決める）")
     ap.add_argument("--data", nargs="*", default=None, metavar="DIR",
                     help="データセットのフォルダ（shard.npz があるフォルダ）か、それらを含む親フォルダ。複数可。画面でも入力できる")
     ap.add_argument("--port", type=int, default=8018)
@@ -563,7 +563,7 @@ def main():
     if args.cache_dir:
         CACHE_DIR = Path(args.cache_dir).expanduser().resolve()
     import uvicorn
-    print(f"loudness tuner  http://{args.host}:{args.port}   agc={AGC_SOURCE}   data={DATA_DIRS or '(画面で入力)'}", flush=True)
+    print(f"loudness-correction tuner  http://{args.host}:{args.port}   agc={AGC_SOURCE}   data={DATA_DIRS or '(画面で入力)'}", flush=True)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 

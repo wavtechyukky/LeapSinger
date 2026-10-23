@@ -2,11 +2,21 @@
 
 **日本語**: [README.md](README.md)
 
-LeapSinger is a diffusion-style **acoustic model** for singing voice. It runs very fast — even on a CPU — and produces stable, clean periodic (harmonic) content. It takes phonemes, their durations, and pitch (F0), and generates a mel-spectrogram. Training needs only audio plus phoneme labels with timing; it does not depend on any particular language. (All of our examples use Japanese data, though.)
+LeapSinger is a diffusion-style **acoustic model** for singing voice. It runs very fast — even on a CPU — and produces stable, clean periodic (harmonic) content. It takes phonemes, their durations, and pitch (F0), and generates a mel-spectrogram. Training needs only audio plus phoneme labels with timing; it does not depend on any particular language. (The released models are trained on Japanese data.)
 
 ![LeapSinger overview](doc/fig/leapsinger_overview.png)
 
 **▶ Listen to the demo: https://wavtechyukky.github.io/LeapSinger/demo/**
+
+### What changed in V2 (2.0.0)
+
+- **No GAN.** A teacher solves the flow in 16 steps; a 1-step student is then distilled from the teacher's start/output pairs (a second rectified flow, "reflow"). Inference is still one step, the harmonics are cleaner than the GAN model's, and the spectra of voiceless consonants are closer to the recordings. The released model (`3singer_v2_student.pt`) is this student.
+- **A "loose" loudness correction of the training mel** (`data.loudness_agc`). It removes phrase-to-phrase level differences and slow crescendi from the training target while keeping the singing expression as far as possible, so the model sings at a constant level whatever the score. The values are chosen with the bundled [loudness-correction tuner](#loudness-correction-tuner).
+- **Relative position inside each phoneme** as a condition (`model.pos_cond`), as used in DiffSinger. It gave no significant quality gain on the Japanese singers, but there was no reason to drop it either, so it stays.
+- **Language packs** (`dict/<language>.yaml`) and `tools/convert_labels.py` for other label formats. Dictionaries, recipes and configs for English, Korean and Mandarin are included (models: Japanese only).
+- **ONNX export** folds the excitation's harmonic sum into one `Loop`, cutting peak memory on long phrases by about 5×. `--speaker embed` also writes the speaker-vector table (`<name>.speakers.json`).
+- **Evaluation tools** (`tools/eval_ab.py`, `tools/render_ab.py`) and `tests/`.
+- v0.1.0 checkpoints and preprocessed data still work ([Compatibility](#compatibility)).
 
 ## What is LeapSinger?
 
@@ -21,19 +31,20 @@ The non-v/uv model (top) lays harmonics across every frame. The v/uv model (bott
 Through a lot of experiments we found two things: a high-quality neural vocoder for singing is sensitive to the *texture* of the mel, and the hard part for an acoustic model is drawing clean periodic content. LeapSinger starts not from noise but from a pseudo-mel that already has the shape of the pitch, so it avoids the hardest part — learning to draw the periodic content. This design gives:
 
 - **High-quality periodic content** — it draws clean, low-noise periodic content stably. This helps both the texture of the vocoder output and how well each speaker's voice is reproduced.
-- **Speed** — there is only one reverse step, so even on a single CPU core the RTF is under 0.03. You *can* use more steps, but going beyond one step actually moves the result *away* from the ground truth.
+- **Speed** — there is only one reverse step, so even on a single CPU core the RTF is under 0.03. In V2 the 16-step teacher exists only during training; its knowledge is moved into a 1-step student (the student is not significantly different from the teacher, and inference stays one step).
 
 Other features:
 
 - **Multi-speaker** — switch voices by speaker ID. As an example, we distribute a model with three Japanese singers (Oniku Kurumi / Natsume Yuuri / Namine Ritsu).
-- **Style control** — switch singing styles within the same speaker.
+- **Style control** — switch singing styles within the same speaker (`n_styles` > 0; the v0.1.0 Namine Ritsu three-style model is the example. The V2 release model has no styles).
 
 ## Demo
 
 **https://wavtechyukky.github.io/LeapSinger/demo/**
 
-- A three-speaker model, comparing the generated results side by side with GT (the real recordings). Training on a single speaker slightly improves the speaker fidelity of the mel, but we saw no large difference in synthesis quality.
-- A style-control demo.
+- A three-speaker model, comparing the generated results side by side with GT (the real recordings), for **V1** (v0.1.0, GAN) and **V2** (2.0.0, the reflow student). Training on a single speaker slightly improves the speaker fidelity of the mel, but we saw no large difference in synthesis quality.
+- Songs sung from scores the model never saw, V1 next to V2.
+- A style-control demo (the v0.1.0 style-bearing model).
 
 ## Performance
 
@@ -53,7 +64,7 @@ RTF per acoustic model, comparing Python native vs. ONNX across core counts:
 - **ONNX** is a few times slower than native because of onnxruntime overhead, but it is still more than 15× faster than real time. 4 cores are fastest; 8 or more is actually slower, because the excitation sums its harmonics one at a time — which is what keeps memory independent of the input length — and that sum does not parallelise across cores.
 - **The NHVSing vocoder** runs at RTF under 0.1 on CPU (see the NHVSing repository for details).
 
-(Measured on Apple Silicon, 10 cores, onnxruntime CPU, a real 7.0-second phrase, median of 9 runs. The ONNX build is `export/cli.py` with its defaults, `--variant diffsinger --hop 512`. Results vary by machine.)
+(Measured on Apple Silicon, 10 cores, onnxruntime CPU, a real 7.0-second phrase, median of 9 runs. The ONNX build is `export/cli.py` with its defaults, `--variant diffsinger --hop 512`. Results vary by machine. The V2 student is the same network plus a small position embedding and still runs in one step, so the RTF is unchanged.)
 
 The frame settings are 44.1 kHz and hop size 256. Hop size 512 is handled by averaging each pair of adjacent frames.
 
@@ -80,7 +91,9 @@ Python 3.10 or later. Clone the repository and do an editable install.
     pip install -e .                  # inference, re-synthesis, notebooks
     pip install -e ".[train]"         # training (adds TensorBoard)
     pip install -e ".[export]"        # ONNX export
-    pip install -e ".[train,export]"  # everything
+    pip install -e ".[tuner]"         # the loudness-correction tuner (fastapi, uvicorn)
+    pip install -e ".[dev]"           # tests/ (pytest, httpx)
+    pip install -e ".[train,export,tuner,dev]"  # everything
 
 - **PyTorch** is best installed to match your environment (CPU or CUDA build). To train on GPU, install the CUDA build following the [PyTorch site](https://pytorch.org/).
 - **F0 extraction (RMVPE)** weights download automatically on first run (HuggingFace → `preprocess/algorithms/rmvpe.pt`).
@@ -93,15 +106,19 @@ Training and export are driven by YAML (there are examples in `configs/`). A YAM
 
 - `model` — `spk_dim` (greater than 0 means multi-speaker), `n_speakers`, `n_styles` (greater than 0 enables styles), `use_uv` (whether to feed v/uv as a condition), `pos_cond` (the relative position inside each phoneme, added to the condition: `phoneme` switches it, on by default; `encoding: sinusoidal` is DiffSinger's stretch embedding, round(1000·i/n) → sinusoidal embedding → MLP; `raised_cosine` is the old code of the 2026-10-16 A/B, kept only to load old checkpoints, and `unit`, the position inside each nucleus unit, works only with it and is not used; a resumed run keeps its checkpoint's setting), `dur_cond` (log(1 + phoneme frames) embedding; off by default). `--set model.pos_cond.phoneme=false` overrides the config for A/B runs without editing it.
 - `excitation` — `n_harm` (number of harmonics), `harm_decay` (harmonic decay, 1.5 by default), `noise_ratio` (white-noise strength), `x0_sigma` (standard deviation of Gaussian noise added to the flow's starting point; above 0 the start becomes stochastic and the model becomes a multi-step reflow teacher; 0 by default).
-- `train` — `lr`, `max_updates`, `num_steps` (inference steps; **1** recommended), `balance_speakers` (sample speakers equally), `min_batch_items` (above 0: pack longest-first and split the final leftover with the previous batch, so the few longest phrases never form a tiny batch of their own), and so on. Training logs the pre-clip gradient norm (max and median per interval), the smallest batch and the largest loss per interval to TensorBoard, and writes every step whose gradient norm exceeds 5× the recent median, with the batch's contents, to `<run>/spikes.log`. `amp` (`fp32` | `bf16`; `bf16` runs the encoder and the velocity network under autocast, faster on an A100). `lr_decay` / `lr_decay_steps` (below 1, the learning rate and the discriminator's learning rate fall smoothly every step, by a factor of lr_decay every lr_decay_steps; 0.8 / 5000 is DiffSinger's pace; the default 1.0 keeps it constant). Checkpoints also record the training settings (batch, learning rate, precision and so on), and a resumed run reports any setting that differs. Each step's time is broken down as well: `time/data_wait_ms` (waiting for data), `time/h2d_ms` (copy to the GPU), `time/step_ms` (compute), `time/steps_per_sec`, `time/eval_s` and `time/save_s`, and the GPU time inside the compute, `time/gpu_{aug,enc,exc,net,gan,bwd,opt}_ms` (`exc` is the pseudo-mel, `net` the velocity network and the losses).
+- `train` — `lr`, `max_updates`, `num_steps` (inference steps: **1** for a 1-step model or a student, 16 for a reflow teacher), `reflow_teacher` (path of the teacher checkpoint; setting it makes the run a reflow student. `reflow_teacher_steps` (steps the teacher uses to solve the pairs, 8 by default), `reflow_draws` (pairs per phrase, 4), `reflow_algorithm` (euler | rk2 | rk4), `reflow_t` (zero = t = 0 only, a 1-step model; uniform = any t), `reflow_seed`. The student starts from the teacher's weights and refuses a config that differs from the teacher's checkpoint), `cons_weight` / `cons_weight_next_ms` (loss weight on consonant frames and the head of the phoneme after each; 1.0 = off), `balance_speakers` (sample speakers equally), `min_batch_items` (above 0: pack longest-first and split the final leftover with the previous batch, so the few longest phrases never form a tiny batch of their own), and so on. Training logs the pre-clip gradient norm (max and median per interval), the smallest batch and the largest loss per interval to TensorBoard, and writes every step whose gradient norm exceeds 5× the recent median, with the batch's contents, to `<run>/spikes.log`. `amp` (`fp32` | `bf16`; `bf16` runs the encoder and the velocity network under autocast, faster on an A100). `lr_decay` / `lr_decay_steps` (below 1, the learning rate and the discriminator's learning rate fall smoothly every step, by a factor of lr_decay every lr_decay_steps; 0.8 / 5000 is DiffSinger's pace; the default 1.0 keeps it constant). Checkpoints also record the training settings (batch, learning rate, precision and so on), and a resumed run reports any setting that differs. Each step's time is broken down as well: `time/data_wait_ms` (waiting for data), `time/h2d_ms` (copy to the GPU), `time/step_ms` (compute), `time/steps_per_sec`, `time/eval_s` and `time/save_s`, and the GPU time inside the compute, `time/gpu_{aug,enc,exc,net,gan,bwd,opt}_ms` (`exc` is the pseudo-mel, `net` the velocity network and the losses).
 - `gan` — settings for the GAN that sharpens texture. `enabled` (`false` = flow loss + mel loss only), `gan_start_step` (the step at which the GAN turns on), `gan_strength` (strength of the adversarial loss), and so on.
-- `data` — `spk_map` / `style_map` (mapping from dataset folder name → speaker ID / style ID), `max_sec` (drop phrases longer than this; the dropped names are printed at start-up), `loudness_agc` (slow automatic gain on the target mel: loudness changes slower than `sigma_sec` — phrase-to-phrase level, section-level crescendi — are removed, note-level and phonetic dynamics are kept, so the model sings at a constant level whatever the score; `null` turns it off).
+- `data` — `spk_map` / `style_map` (mapping from dataset folder name → speaker ID / style ID), `eval_songs` (songs held out per dataset for evaluation), `eval_dbs` (restrict the held-out songs to these datasets; all of them if absent), `max_sec` (drop phrases longer than this; the dropped names are printed at start-up), `loudness_agc` (slow automatic gain on the target mel: loudness changes slower than `sigma_sec` — phrase-to-phrase level, section-level crescendi — are removed, note-level and phonetic dynamics are kept, so the model sings at a constant level whatever the score; `null` turns it off; choose the values with the [loudness-correction tuner](#loudness-correction-tuner)).
+
+Any key can be overridden on the command line without editing the config: `--set key=value` (for example `--set train.num_steps=1 --set model.pos_cond.phoneme=false`; repeatable).
 
 ### Building a dictionary
 
 The Japanese phoneme list is in `dict/ja.phonemes` (one phoneme per line, the order is the ID, `pau` at the top is ID 0, and anything after `#` is a comment). To use a different language or your own phonemes, make a file in the same format and pass it to each command with `--phonemes <file>` (if omitted, the Japanese `dict/ja.phonemes` is used).
 
 Phoneme classes that the list cannot express go in a language pack, `dict/<language>.yaml` (for example `dict/ja.yaml` and `dict/en.yaml`). It points to the phoneme list with `phonemes` and defines `vowels` and `silence`; every other phoneme is a consonant. For the evaluation tool it can also list `devoiced` (devoiced vowels), `voiceless` and `voiced` consonants, and `steady_vowels` (vowels whose long middles are checked for wobble); these are optional. Training and evaluation look in `dict/` for the language pack whose phoneme list matches the model's or the data's. The consonant loss weight (`train.cons_weight`) needs a language pack.
+
+Bundled dictionaries and language packs: Japanese `ja` (the released models), English `en` (CMUdict's 39 phonemes + 6) and `en_full` (54, with the symbols common in singing labels), Korean `ko_coda` (Team CODA's romanisation, 37 phonemes), Mandarin `zh_opencpop` (pinyin initials and finals, 61 phonemes).
 
 ### Preprocessing
 
@@ -120,26 +137,56 @@ F0 is extracted with RMVPE. (Please do not run RMVPE across multiple processes.)
 - A recipe can name its phoneme list with `phonemes: dict/<list>.phonemes` (`--phonemes` takes precedence).
 - `--check` only checks the labels, without processing audio. It reports symbols missing from the phoneme list (after `phon_norm` and the silence map), missing wav or label files, and labels that run past the end of the audio. It writes nothing.
 - `layout: from_lab` reads only the songs that have a label file (the `lab` template may be an absolute path).
-- Labels that only hold phoneme durations (Opencpop's `transcriptions.txt`, DiffSinger's `transcriptions.csv`) are converted to per-segment labs with `tools/convert_labels.py` first.
+- Labels that only hold phoneme durations (Opencpop's `transcriptions.txt`, DiffSinger's `transcriptions.csv`), HTK labs that need tidying (`lab`, `labdir`) and GTSinger's IPA labels are converted to per-segment labs with `tools/convert_labels.py` first.
+- `save_wav: true` in a recipe also keeps each phrase's waveform in `shard_wav.npz` (needed for playback in the loudness-correction tuner and for `train.pitch_aug`).
 
 ### Training
 
-Training has two stages. The first stage learns the base voice with a flow loss plus a mel loss; the second stage turns on a GAN to sharpen texture. (This is set in the config's `gan` section; `gan.enabled: false` gives the flow loss plus mel loss only.)
+**The V2 recipe (recommended)**: no GAN; train a 16-step teacher, then distil a 1-step student. The Japanese three-singer config is `configs/3singer_v2.yaml`, whose header lists the commands.
 
-    python -m train --config configs/<name>.yaml \
+    # 1. Teacher (50k steps)
+    python -m train --config configs/3singer_v2.yaml \
+      --data_dirs data/oniku data/natsume data/ritsu \
+      --run_name 3singer_v2_teacher --out_root log --device cuda
+    # 2. Student (20k steps from the teacher's weights; the pairs are built automatically and are not saved)
+    python -m train --config configs/3singer_v2.yaml \
+      --data_dirs data/oniku data/natsume data/ritsu \
+      --run_name 3singer_v2_student --out_root log --device cuda --max_updates 20000 \
+      --set train.reflow_teacher=log/3singer_v2_teacher/ckpt_050000.pt --set train.reflow_teacher_steps=16 \
+      --set train.num_steps=1 --set train.lr=2.0e-4
+
+On one A100 the teacher takes about 3.3 hours, the pairs about 10 minutes and the student about 1.5 hours. The pairs (four per phrase) are held in RAM: about 8.5 GB for the three singers, plus the harmonic cache of about 4.3 GB. The student's config must match the teacher's checkpoint (only `recon_weight`, `num_steps` and `flow_loss` may differ).
+
+**The V1 recipe (GAN)**: one run; the first stage learns the base voice with a flow loss plus a mel loss, the second turns on a GAN to sharpen texture (`configs/3speaker_gan2d.yaml`; the `gan` section controls it, `gan.enabled: false` gives the flow loss plus mel loss only). This is how the v0.1.0 models were made, and it still works.
+
+    python -m train --config configs/3speaker_gan2d.yaml \
       --data_dirs data/<db> [data/<db2> ...] \
       --run_name <name> --out_root log --device cuda
 
-Running the same command again automatically resumes from where it stopped.
+In both cases, running the same command again automatically resumes from where it stopped. `--init_from <ckpt>` starts a new run from another checkpoint's weights (the model structure follows that checkpoint, so a v0.1.0 checkpoint works too).
+
+### Loudness-correction tuner
+
+A local web app for choosing `data.loudness_agc` by eye and by ear on a preprocessed dataset (`tools/loudness_tuner/`; it computes with the same `leapsinger/loudness.py` the training uses).
+
+    pip install -e ".[tuner]"
+    python tools/loudness_tuner/app.py --data data/ritsu     # → http://127.0.0.1:8018
+
+Point it at a dataset folder (the one holding `shard.npz`) or at a parent folder that holds several. For every phrase it plots the frame loudness, the slow envelope before and after, the gain and the pauses; with data preprocessed with `save_wav: true` you can A/B the original and the normalised audio. It also reports the distribution over the whole dataset (phrase-to-phrase level differences and so on). The YAML box shows the current values ready to paste into `data.loudness_agc`. Details: `tools/loudness_tuner/README.md`.
+
+### Evaluation tools
+
+- `tools/eval_ab.py` — compares trained runs on the held-out phrases (synthesised from the true phoneme durations and F0). Besides the overall error it reports the error at phoneme edges vs. middles, per-band fine-texture ratios, roughness of harmonic peaks and valleys, per-consonant-class spectral shape and centroid shifts, and GAN-like regular patterns, as a table over runs × checkpoints × step counts.
+- `tools/render_ab.py` — renders the same phrases TensorBoard shows with several models, as wav files and mel figures (for listening tests).
 
 ### Export
 
     python -m export.cli \
-      --ckpt log/<run>/ckpt_050000.pt \
+      --ckpt log/<run>/ckpt_020000.pt \
       --out export/<name> --model-name <name> \
-      --variant diffsinger --hop 256 --speaker bake --spk-id 0
+      --variant diffsinger --hop 256 --speaker embed --verify
 
-For speaker handling (bake / embed / none) and other details, see "Export to ONNX" below.
+For speaker handling (bake / embed / none) and other details, see "Export to ONNX" below. With `--speaker embed`, `<name>.speakers.json` (every speaker's vector and the phoneme list) is written alongside.
 
 You can try the whole flow — from export to use — in a notebook. Download the model from the Release and place it in `notebooks/sample_data/` (see `place_model_here.txt` in that folder).
 
@@ -152,7 +199,7 @@ The notebook exports the acoustic model to a single ONNX and runs it end to end 
 `export/` converts a checkpoint into a self-contained ONNX graph. The excitation and the single-step flow are baked into the graph, so the caller only needs to pass phonemes, durations, and F0. For speaker handling, you can choose:
 
 - **bake** — fix a single voice. This makes the simplest graph (no speaker input).
-- **embed** — take a speaker vector as input. One graph can switch to any voice.
+- **embed** — take a speaker vector as input. One graph can switch to any voice. Each speaker's vector (what to feed as `spk_embed`) and the phoneme list are in the `<name>.speakers.json` written next to the graph.
 - **none** — for single-speaker models. No speaker input and no baking (a graph with no notion of speaker). For multi-speaker models, use bake or embed.
 
 A style-bearing model (`n_styles` > 0) is exported with `--variant full`, and the style to use is baked into the graph with `--style-id` (default 0) — one ONNX per style.
@@ -161,24 +208,32 @@ As the last post-export pass, the excitation's harmonic sum (a straight-line cha
 
 ### Vocoder
 
-Two NHVSing vocoders are bundled under `checkpoints/`.
+NHVSing vocoders are bundled under `checkpoints/`.
 
-- `nhv_v3_2.onnx` — takes a hop-size-256 mel and F0.
-- `nhv_v3_2x.onnx` — takes a hop-size-512 mel and F0.
+- `nhv_v3_2_1.onnx` — takes a hop-size-256 mel and F0 (V3.2.1; used for the training previews and the demo).
+- `nhv_v3_2_1x.onnx` — the hop-size-512 build.
+- `nhv_v3_2.onnx` / `nhv_v3_2x.onnx` — V3.2 (the v0.1.0 vocoders).
 
-The bundled version is **V3.2** — the latest weights. It fixes an abrupt per-frame weakening of the waveform at high pitch by switching the LTV filter's overlap-add to a Hann window. The input/output contract is identical to V3.1, so it is a drop-in replacement (see [NHVSing](https://github.com/wavtechyukky/NHVSing/) for details).
+V3.2 fixes an abrupt per-frame weakening of the waveform at high pitch by switching the LTV filter's overlap-add to a Hann window; V3.2.1 is V3.2 trained for more epochs. The input/output contract is the same for all of them, so they are drop-in replacements (see [NHVSing](https://github.com/wavtechyukky/NHVSing/) for details).
+
+### Compatibility
+
+- The v0.1.0 models (`3speaker_gan2d.pth`, `3singer_ritsu3style_uv_gan2d.pth`) still run in `infer.py`, export with `export/cli.py` and can seed a run with `--init_from` (they are loaded in their own structure, without the position condition).
+- The preprocessed data format (`shard.npz` + `metadata.json`) is unchanged.
+- The bundled configs' defaults were changed for V2 training (`harm_decay` 1.5, batch sizes, the position condition, the slow AGC and so on). The exact file the v0.1.0 models were trained with is `git show v0.1.0:configs/3speaker_gan2d.yaml`.
+- V2 checkpoints do not load in the v0.1.0 code (they carry the position condition's weights).
 
 ## Options
 
-- **Dictionary** — you can specify any phoneme dictionary. The design can handle languages other than Japanese (multilingual support itself is future work).
+- **Dictionary** — you can specify any phoneme dictionary. Besides Japanese, dictionaries and language packs for English, Korean and Mandarin are bundled, with recipes for the corpora (`configs/recipes/`) and teacher configs (`configs/{en,ko,zh}_teacher.yaml` and others). No models are released for them (English was trained but its quality is not good enough yet; Korean and Mandarin are configs only because of the datasets' terms).
 - **v/uv handling** — choose between a mode that feeds voiced/unvoiced (v/uv) as a condition, and a mode that uses only a continuous F0 with the gaps filled by linear interpolation.
 - **Excitation tuning** — change the harmonic decay, the number of harmonics, and the white-noise strength.
 - **Training recipes** — training conditions are set in YAML (which datasets to use, speaker IDs, per-speaker styles and data, and so on).
 
 ## Future work
 
-- **Multilingual support** — so far we validate with Japanese data, but the design itself is language-independent. We plan to support other languages with their own phoneme dictionaries and data, aiming for a single model that can handle multiple languages.
-- **Higher quality** — we think there is still room to improve speaker fidelity, for example by refining how the pseudo-mel is generated and tuning its parameters.
+- **Multilingual support** — the dictionaries, language packs, label conversion and recipes are in place, but only Japanese models are released. The goal is models for other languages from data we may publish, and one model that handles several languages.
+- **Consonants** — consonants seen in training are reproduced about as accurately as vowels, but in unseen sequences the timing of plosive and affricate transitions drifts. More data and the consonant loss weight (`train.cons_weight`) are the levers.
 
 ## License
 

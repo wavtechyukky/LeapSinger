@@ -1,4 +1,4 @@
-# 音量正規化チューナー（loudness tuner）
+# 音量補正チューナー（loudness-correction tuner）
 
 学習目標の mel に掛ける「遅い自動ゲイン」（`leapsinger/loudness.py`、config の `data.loudness_agc`）のパラメータを、
 前処理済みのデータセットで目視・試聴しながら決めるためのローカル Web アプリです。学習（`dataset.py`）と同じ関数で

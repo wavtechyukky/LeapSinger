@@ -1,4 +1,5 @@
-# Three-speaker singing model — Oniku Kurumi (0) / Natsume Yuuri (1) / Namine Ritsu (2).
+# Three-speaker singing model — Oniku Kurumi (0) / Natsume Yuuri (1) / Namine Ritsu (2). The V1 (GAN) recipe.
+# For new models prefer configs/3singer_v2.yaml (a GAN-free teacher distilled into a 1-step student).
 # Trained from scratch in one run with a two-stage schedule:
 #   steps 0–20k : flow + reconstruction loss only (the base voice)
 #   steps 20k–50k : a mel-spectrogram discriminator (GAN) is switched on to sharpen texture
@@ -7,7 +8,9 @@
 #   python -m train --config configs/3speaker_gan2d.yaml \
 #       --data_dirs /path/to/oniku /path/to/natsume /path/to/ritsu \
 #       --run_name 3speaker_gan2d --out_root <log> --device cuda
-#   (Do not pass --init_from/--finetune; training starts from scratch and auto-resumes on re-run.)
+#   (Do not pass --init_from; training starts from scratch and auto-resumes on re-run.)
+# The defaults below have moved on since v0.1.0 (harm_decay 1.5, halved batches, the position condition, the
+# slow AGC). The exact file the v0.1.0 models were trained with: git show v0.1.0:configs/3speaker_gan2d.yaml
 mel:
   sr: 44100
   hop: 256

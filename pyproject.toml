@@ -33,7 +33,7 @@ train = [
     "tensorboard",
 ]
 
-# The loudness tuner web app (tools/loudness_tuner/, `python tools/loudness_tuner/app.py`).
+# The loudness-correction tuner web app (tools/loudness_tuner/, `python tools/loudness_tuner/app.py`).
 tuner = [
     "fastapi",
     "uvicorn",
