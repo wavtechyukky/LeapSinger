@@ -11,7 +11,7 @@ config の `data.loudness_agc` で有効になり、dataset.py（と train.py �
     mel'    = mel + c[None, :] / DB                         全 bin へ定数加算（床 MEL_FLOOR で止める）
     wav'    = wav · 10^(c_interp / 20)                      同じゲインを波形へ（試聴用）
 
-numpy と scipy だけに依存する。research/loudness_tuner（調整用 Web アプリ）はこのモジュールを
+numpy と scipy だけに依存する。tools/loudness_tuner（調整用 Web アプリ）はこのモジュールを
 そのまま import するので、既定値は AGC_DEFAULTS 以外に書かない。
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ MEL_FLOOR = float(np.log(1e-5))       # 前処理の mel クランプ下限（�
 
 AGC_DEFAULTS = dict(
     sigma_sec=1.0,      # これより遅い音量変化を取り除く（ガウス平滑の σ）
-    target_db=-30.0,    # 揃える先のフレーム音量（ritsu / synthv の実測中央値が −28〜−33 dB）
+    target_db=-30.0,    # 揃える先のフレーム音量（学習に使った歌声データの実測中央値が −28〜−33 dB）
     k=1.0,              # 強さ。1 = 遅い成分を全部取る、0 = 何もしない
     max_gain_db=12.0,   # 持ち上げの上限（ささやき・歌い出しの極端な増幅を防ぐ）
     max_cut_db=12.0,    # 下げの上限

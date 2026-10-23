@@ -33,6 +33,19 @@ train = [
     "tensorboard",
 ]
 
+# The loudness tuner web app (tools/loudness_tuner/, `python tools/loudness_tuner/app.py`).
+tuner = [
+    "fastapi",
+    "uvicorn",
+    "pydantic>=2",
+]
+
+# Running tests/ (`python -m pytest tests/`); httpx is what fastapi's TestClient uses.
+dev = [
+    "pytest",
+    "httpx",
+]
+
 # Notes:
 # - F0 extraction uses RMVPE (a neural pitch estimator). See README for the weight download.
 # - The vocoder (mel -> waveform) is bundled as an ONNX (checkpoints/nhv_v3_2.onnx) and run via

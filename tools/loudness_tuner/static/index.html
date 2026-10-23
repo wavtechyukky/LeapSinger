@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>音量正規化チューナー</title>
+<style>
+  :root { --bg:#f5f6f8; --panel:#fff; --line:#dcdfe4; --text:#222; --muted:#667; --accent:#2f6fdb; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  header { background:#1f2430; color:#fff; padding:10px 18px; display:flex; align-items:baseline; gap:16px; }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  header .src { color:#aab; font-size:12px; }
+  main { padding:12px 18px 60px; max-width:1500px; margin:0 auto; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:12px; }
+  .panel h2 { font-size:13px; margin:0 0 8px; color:var(--muted); font-weight:600; letter-spacing:.02em; }
+  .row { display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
+  textarea { width:100%; min-height:48px; font:12px/1.4 ui-monospace, Menlo, monospace; border:1px solid var(--line); border-radius:6px; padding:6px; }
+  table.dbs { border-collapse:collapse; width:100%; font-size:13px; margin-top:8px; }
+  table.dbs th, table.dbs td { border-bottom:1px solid var(--line); padding:4px 8px; text-align:left; white-space:nowrap; }
+  table.dbs tr.sel { background:#eef3fd; }
+  table.dbs td.num { text-align:right; }
+  .warn { color:#b35c00; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:8px 14px; }
+  .group label { display:block; font-size:12px; color:var(--muted); }
+  .group input[type=number] { width:100%; padding:4px 6px; border:1px solid var(--line); border-radius:5px; font-size:13px; }
+  button { padding:5px 12px; border:1px solid #9aa3b5; background:#fff; border-radius:6px; cursor:pointer; font-size:13px; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  input[type=text], input[type=number].small, select { padding:4px 6px; border:1px solid var(--line); border-radius:5px; font-size:13px; }
+  input[type=number].small { width:70px; }
+  .status { color:var(--muted); font-size:13px; min-height:1.4em; }
+  .pager { display:flex; gap:8px; align-items:center; justify-content:center; margin:10px 0; font-size:13px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); }
+  .legend i { display:inline-block; width:18px; height:0; border-top:3px solid; margin-right:5px; vertical-align:middle; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+  .card.playing { outline:2px solid var(--accent); }
+  .card h3 { font-size:13px; margin:0 0 6px; font-weight:600; display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; }
+  .card h3 .name { font-family:ui-monospace, Menlo, monospace; }
+  .card h3 .stat { color:var(--muted); font-weight:400; }
+  .badge { display:inline-block; font-size:11px; padding:1px 7px; border-radius:10px; background:#eef; color:#335; }
+  .badge.warn { background:#fde8d2; color:#8a4600; }
+  .badge.err { background:#fbd9d9; color:#8a1a1a; }
+  canvas { display:block; width:100%; }
+  .mels img { display:block; width:100%; height:96px; margin-top:4px; border-radius:3px; image-rendering:auto; background:#000; }
+  .mels .cap { font-size:11px; color:var(--muted); margin-top:2px; }
+  .audio { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px; font-size:12px; color:var(--muted); }
+  .audio button.play { min-width:110px; font-family:ui-monospace, Menlo, monospace; }
+  .audio button.play.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .audio .pos { font-family:ui-monospace, Menlo, monospace; min-width:110px; }
+  .audio .bar { flex:1 1 160px; height:6px; background:#e6e8ee; border-radius:3px; overflow:hidden; cursor:pointer; }
+  .audio .bar i { display:block; height:100%; width:0; background:var(--accent); }
+  .audio .none { color:#999; }
+  table.stats { border-collapse:collapse; font-size:13px; }
+  table.stats th, table.stats td { border-bottom:1px solid var(--line); padding:3px 10px; text-align:right; }
+  table.stats th:first-child, table.stats td:first-child { text-align:left; }
+  progress { width:260px; vertical-align:middle; }
+  .yaml { display:flex; gap:10px; align-items:flex-start; margin-top:10px; }
+  .yaml pre { margin:0; padding:8px 10px; background:#f0f2f6; border:1px solid var(--line); border-radius:6px; font:12px/1.45 ui-monospace, Menlo, monospace; min-width:260px; }
+  .yaml .cap { font-size:12px; color:var(--muted); max-width:420px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>音量正規化チューナー</h1>
+  <span class="src" id="agcsrc"></span>
+</header>
+<main>
+
+<section class="panel">
+  <h2>データ</h2>
+  <div class="row" style="align-items:flex-start">
+    <div style="flex:1 1 420px">
+      <label style="font-size:12px;color:var(--muted)">データセットのフォルダ（shard.npz と metadata.json があるフォルダ、またはそれらを含む親フォルダ。1 行 1 つ）</label>
+      <textarea id="dirs" placeholder="例: data/ritsu　または　data"></textarea>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button id="btnScan" class="primary">Scan</button>
+    </div>
+  </div>
+  <div id="dbs"></div>
+</section>
+
+<section class="panel">
+  <h2>パラメータ（遅い自動ゲイン）</h2>
+  <div class="grid" id="params"></div>
+  <div class="row" style="margin-top:10px">
+    <button id="btnRun" class="primary">計算</button>
+    <button id="btnPageMedian" title="このページのフレーズ平均音量の中央値を target に入れる">ページ中央値を target に</button>
+    <label>並び <select id="sort"><option value="name">名前順</option><option value="shuffle">シャッフル</option></select></label>
+    <label>seed <input type="number" class="small" id="seed" value="0"></label>
+    <button id="btnReshuffle">reshuffle</button>
+    <label>検索 <input type="text" id="query" placeholder="フレーズ名の一部（Enter）"></label>
+    <label>1 ページ <input type="number" class="small" id="pageSize" value="12" min="1" max="200"></label>
+    <label><input type="checkbox" id="audioOnly" checked> 音声があるフレーズだけ</label>
+    <label><input type="checkbox" id="showMel"> mel を表示</label>
+    <label><input type="checkbox" id="showLabels" checked> 音素ラベル</label>
+    <button id="btnSeq" title="このページの正規化音を順に再生">このページを連続再生</button>
+    <button id="btnSeqStop">停止</button>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <div class="legend">
+      <span><i style="border-color:#b4b7bd"></i>E[t]（フレーム音量）</span>
+      <span><i style="border-color:#f5c58a"></i>E[t] 正規化後</span>
+      <span><i style="border-color:#2f6fdb"></i>遅い包絡 前</span>
+      <span><i style="border-color:#e8731f"></i>遅い包絡 後</span>
+      <span><i style="border-color:#8a3fc8;border-top-style:dashed"></i>ゲイン c[t]（右軸）</span>
+      <span><i style="border-color:#555;border-top-style:dotted"></i>target</span>
+    </div>
+  </div>
+  <div class="yaml">
+    <pre id="yaml"></pre>
+    <div>
+      <button id="btnCopyYaml">コピー</button>
+      <div class="cap" style="margin-top:6px">今の値を config の <code>data.loudness_agc</code> にそのまま貼る（学習の dataset.py が目標 mel に掛ける）。</div>
+    </div>
+  </div>
+  <div class="status" id="status"></div>
+</section>
+
+<div class="pager" id="pagerTop"></div>
+<div id="cards"></div>
+<div class="pager" id="pagerBottom"></div>
+
+<section class="panel">
+  <h2>DB 全体の分布（全フレーズを現在のパラメータで走査。歌唱部 1 秒未満のフレーズは除外）</h2>
+  <div class="row">
+    <button id="btnStats">DB全体の分布を計算</button>
+    <button id="btnStatsCancel">中止</button>
+    <progress id="statsProg" value="0" max="1" hidden></progress>
+    <span class="status" id="statsStatus"></span>
+    <button id="btnDbMedian" hidden title="DB のフレーズ平均音量の中央値を target に入れる">DB 中央値を target に</button>
+  </div>
+  <div id="statsOut" style="margin-top:8px"></div>
+</section>
+
+</main>
+<audio id="seq" hidden></audio>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const S = { cfg:null, dbs:[], sel:null, resp:null, page:1, statsJob:null, statsTimer:null, dbMedian:null };
+
+function setStatus(msg, isErr) { const el = $('status'); el.textContent = msg || ''; el.style.color = isErr ? '#b00' : ''; }
+function fmtErr(j) {
+  const d = j && j.detail;
+  if (Array.isArray(d)) return d.map(e => (e.loc || []).slice(1).join('.') + ': ' + e.msg).join('; ');
+  return (d && String(d)) || JSON.stringify(j);
+}
+async function post(url, body) {
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  let j = null; try { j = await r.json(); } catch (e) { j = { detail: r.statusText || ('HTTP ' + r.status) }; }
+  if (!r.ok) throw new Error(fmtErr(j));
+  return j;
+}
+async function get(url) {
+  const r = await fetch(url);
+  let j = null; try { j = await r.json(); } catch (e) { j = { detail: r.statusText || ('HTTP ' + r.status) }; }
+  if (!r.ok) throw new Error(fmtErr(j));
+  return j;
+}
+
+// ── 設定とパラメータ ──────────────────────────────────────────────────────────
+async function loadConfig() {
+  S.cfg = await get('/config');
+  $('agcsrc').textContent = '正規化の実装: ' + S.cfg.agc_source;
+  $('dirs').value = (S.cfg.data_dirs || []).join('\n');
+  const g = $('params'); g.innerHTML = '';
+  for (const sp of S.cfg.spec) {
+    const d = document.createElement('div'); d.className = 'group'; d.title = sp.title;
+    const l = document.createElement('label'); l.textContent = sp.label; d.appendChild(l);
+    const i = document.createElement('input'); i.type = 'number'; i.id = 'p_' + sp.key;
+    i.min = sp.min; i.max = sp.max; i.step = sp.step; i.value = S.cfg.defaults[sp.key]; d.appendChild(i);
+    i.addEventListener('input', showYaml);
+    g.appendChild(d);
+  }
+  showYaml();
+}
+function params() {
+  const p = {};
+  for (const sp of S.cfg.spec) p[sp.key] = parseFloat($('p_' + sp.key).value);
+  return p;
+}
+function paramQuery(p) { return Object.entries(p).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&'); }
+// config に貼る形（data.loudness_agc）。キーの並びは /config の yaml_keys
+function yamlText(p) {
+  const keys = (S.cfg && S.cfg.yaml_keys) || Object.keys(p);
+  return 'data:\n  loudness_agc:\n' + keys.map(k => `    ${k}: ${Number.isFinite(p[k]) ? p[k] : ''}`).join('\n');
+}
+function showYaml() { if (S.cfg) $('yaml').textContent = yamlText(params()); }
+$('btnCopyYaml').onclick = async () => {
+  try { await navigator.clipboard.writeText($('yaml').textContent + '\n'); setStatus('YAML をコピーしました'); }
+  catch (e) { setStatus('コピーできません（手で選んでコピーしてください）: ' + e.message, true); }
+};
+
+// ── データ ───────────────────────────────────────────────────────────────────
+async function scan() {
+  const paths = $('dirs').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!paths.length) { setStatus('データセットのフォルダを入れてください', true); return; }
+  setStatus('スキャン中…'); S.dbs = [];
+  for (const path of paths) {
+    try { const j = await post('/scan', { path }); S.dbs.push(...j.dbs); }
+    catch (e) { S.dbs.push({ dir: path, name: '(エラー)', error: e.message }); }
+  }
+  renderDbs(); setStatus(S.dbs.length ? `${S.dbs.length} 件のデータセット` : 'データセットが見つかりませんでした');
+}
+const shortDir = d => d.split('/').filter(Boolean).slice(-2).join('/');
+function renderDbs() {
+  const rows = S.dbs.map((d, i) => {
+    if (d.error) return `<tr><td></td><td title="${esc(d.dir)}">${esc(shortDir(d.dir))}</td><td colspan="6" class="warn">${esc(d.error)}</td></tr>`;
+    const sel = S.sel && S.sel.dir === d.dir;
+    const audio = d.audio.n ? `${d.audio.n} 本 <span style="color:#889">(${d.audio.source})</span>` : '<span style="color:#999">なし</span>';
+    return `<tr class="${sel ? 'sel' : ''}" data-i="${i}">
+      <td><input type="radio" name="db" ${sel ? 'checked' : ''}></td>
+      <td>${esc(d.name)}</td><td class="num">${d.n_phrases}</td><td class="num">${d.hours} h</td>
+      <td class="num">${d.hop} / ${d.frame_rate}</td><td class="num">${d.shard_mb} MB</td><td class="num">${audio}</td>
+      <td style="color:#889;font-size:12px" title="${esc(d.dir)}">${esc(shortDir(d.dir))}</td></tr>`;
+  }).join('');
+  $('dbs').innerHTML = `<table class="dbs"><thead><tr><th></th><th>データセット</th><th>フレーズ</th><th>時間</th><th>hop / fps</th><th>shard</th><th>音声</th><th>フォルダ</th></tr></thead><tbody>${rows}</tbody></table>`;
+  $('dbs').querySelectorAll('tr[data-i]').forEach(tr => tr.addEventListener('click', () => {
+    const d = S.dbs[parseInt(tr.dataset.i)]; S.sel = { dir: d.dir, name: d.name, hop: d.hop, audio_n: d.audio.n };
+    S.dbMedian = null; $('btnDbMedian').hidden = true; $('statsOut').innerHTML = ''; $('statsStatus').textContent = '';
+    renderDbs(); run(1);
+  }));
+}
+
+// ── 計算とカード ─────────────────────────────────────────────────────────────
+async function run(page) {
+  if (!S.sel) { setStatus('データセットを選んでください', true); return; }
+  S.page = page || 1;
+  $('btnRun').disabled = true; setStatus('計算中…');
+  try {
+    S.resp = await post('/compute', {
+      dir: S.sel.dir, params: params(), sort: $('sort').value, seed: parseInt($('seed').value) || 0,
+      query: $('query').value, page: S.page, page_size: parseInt($('pageSize').value) || 12, audio_only: $('audioOnly').checked,
+    });
+    S.page = S.resp.page;
+    renderCards();
+    setStatus(`${S.resp.total} フレーズ（${S.resp.items.length} 件表示） · hop ${S.resp.hop} · ページ中央値 ${S.resp.page_median_db} dB`);
+  } catch (e) { setStatus('エラー: ' + e.message, true); }
+  $('btnRun').disabled = false;
+}
+function pagerHtml() {
+  const r = S.resp; if (!r) return '';
+  return `<button ${r.page <= 1 ? 'disabled' : ''} onclick="run(${r.page - 1})">◀</button>
+    <span>${r.page} / ${r.n_pages}</span>
+    <button ${r.page >= r.n_pages ? 'disabled' : ''} onclick="run(${r.page + 1})">▶</button>`;
+}
+const dirQuery = () => `dir=${encodeURIComponent(S.sel.dir)}`;
+function audioUrl(it, which) {
+  return `/audio?${dirQuery()}&name=${encodeURIComponent(it.name)}&which=${which}&${paramQuery(params())}`;
+}
+function melUrl(it, which) {
+  return `/mel.png?${dirQuery()}&name=${encodeURIComponent(it.name)}&which=${which}&${paramQuery(params())}`;
+}
+function renderCards() {
+  const r = S.resp; const box = $('cards'); box.innerHTML = '';
+  $('pagerTop').innerHTML = $('pagerBottom').innerHTML = pagerHtml();
+  const showMel = $('showMel').checked;
+  for (const it of r.items) {
+    const card = document.createElement('div'); card.className = 'card'; card.dataset.name = it.name;
+    const h = document.createElement('h3');
+    h.innerHTML = `<span class="name">${esc(it.name)}</span><span class="stat">${esc(it.song)} · ${it.dur_sec} s</span>
+      <span class="stat">mean ${it.mean_db} → ${it.mean_after_db} dB</span>
+      <span class="stat">gain ${it.gain_min}…${it.gain_max >= 0 ? '+' : ''}${it.gain_max} dB</span>
+      <span class="stat">遅い包絡 std ${it.slow_std_before} → ${it.slow_std_after} dB</span>
+      ${it.clamp_pct > 0 ? `<span class="badge warn">clamp ${it.clamp_pct}%</span>` : ''}
+      <span class="badges"></span>`;
+    card.appendChild(h);
+    const cv = document.createElement('canvas'); card.appendChild(cv);
+    if (showMel) {
+      const m = document.createElement('div'); m.className = 'mels';
+      m.innerHTML = `<img loading="lazy" alt="mel before"><div class="cap">mel 正規化前</div><img loading="lazy" alt="mel after"><div class="cap">mel 正規化後（同じ色スケール）</div>`;
+      const imgs = m.querySelectorAll('img'); imgs[0].src = melUrl(it, 'before'); imgs[1].src = melUrl(it, 'after');
+      card.appendChild(m);
+    }
+    const a = document.createElement('div'); a.className = 'audio';
+    if (it.has_audio) {
+      a.innerHTML = `<button class="play" data-which="orig">▶ 原音</button><button class="play" data-which="norm">▶ 正規化</button>
+        <div class="bar" title="クリックで移動"><i></i></div><span class="pos">0.0 / ${it.dur_sec} s</span>`;
+      a.querySelectorAll('button.play').forEach(b => b.addEventListener('click', () => playCard(it, b.dataset.which)));
+      a.querySelector('.bar').addEventListener('click', e => {
+        if (P.name !== it.name || !player.duration) return;
+        const r = e.currentTarget.getBoundingClientRect(); player.currentTime = (e.clientX - r.left) / r.width * player.duration;
+      });
+    } else {
+      a.innerHTML = '<span class="none">音声なし（shard_wav.npz に無く、phrase/&lt;データセット&gt;/ にも wav が無い。レシピの save_wav: true で前処理すると試聴できる）</span>';
+    }
+    card.appendChild(a);
+    box.appendChild(card);
+    drawCard(cv, it, r);
+  }
+  queueAudioInfo(r.items.filter(it => it.has_audio));
+  markPlaying();                                   // 再描画（リサイズ等）後も再生中の表示を保つ
+}
+
+// ── 描画 ─────────────────────────────────────────────────────────────────────
+function drawCard(cv, it, r) {
+  const W = Math.max(320, cv.parentElement.clientWidth - 24), H = 190, L = 46, R = 46, Tm = 8, B = $('showLabels').checked ? 26 : 12;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + 'px';
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const n = it.E.length, pw = W - L - R, ph = H - Tm - B;
+  const p = params();
+  const yLo = Math.min(r.y_lo, p.target_db - 3), yHi = Math.max(r.y_hi, p.target_db + 3);
+  const G = Math.max(p.max_gain_db, p.max_cut_db, 3);
+  const x = i => L + (n > 1 ? i / (n - 1) : 0) * pw;
+  const y = v => Tm + (yHi - v) / (yHi - yLo) * ph;
+  const yg = v => Tm + (G - v) / (2 * G) * ph;
+  g.clearRect(0, 0, W, H);
+  // pau の帯
+  g.fillStyle = 'rgba(0,0,0,0.06)';
+  for (let i = 0; i < n;) { if (it.sung[i]) { i++; continue; } let j = i; while (j < n && !it.sung[j]) j++; g.fillRect(x(i), Tm, Math.max(1, x(j - 1) - x(i)), ph); i = j; }
+  // dB グリッド
+  g.strokeStyle = '#eceef2'; g.fillStyle = '#889'; g.font = '10px sans-serif'; g.textAlign = 'right'; g.lineWidth = 1;
+  const stepDb = (yHi - yLo) > 40 ? 12 : 6;
+  for (let v = Math.ceil(yLo / stepDb) * stepDb; v <= yHi; v += stepDb) { g.beginPath(); g.moveTo(L, y(v)); g.lineTo(W - R, y(v)); g.stroke(); g.fillText(v + '', L - 4, y(v) + 3); }
+  g.textAlign = 'left'; g.fillStyle = '#8a3fc8';
+  for (const v of [-G, 0, G]) g.fillText((v > 0 ? '+' : '') + v, W - R + 4, yg(v) + 3);
+  // target
+  g.setLineDash([2, 3]); g.strokeStyle = '#555'; g.beginPath(); g.moveTo(L, y(p.target_db)); g.lineTo(W - R, y(p.target_db)); g.stroke(); g.setLineDash([]);
+  // 右軸 0 線
+  g.strokeStyle = 'rgba(138,63,200,0.25)'; g.beginPath(); g.moveTo(L, yg(0)); g.lineTo(W - R, yg(0)); g.stroke();
+  const line = (arr, color, lw, dash, mask, yf) => {
+    g.strokeStyle = color; g.lineWidth = lw; g.setLineDash(dash || []); g.beginPath(); let pen = false;
+    for (let i = 0; i < n; i++) {
+      if (mask && !mask[i]) { pen = false; continue; }
+      const yy = yf(arr[i]); if (!pen) { g.moveTo(x(i), yy); pen = true; } else g.lineTo(x(i), yy);
+    }
+    g.stroke(); g.setLineDash([]);
+  };
+  line(it.E, '#b4b7bd', 1, null, it.sung, y);
+  line(it.E_after, '#f5c58a', 1, null, it.sung, y);
+  line(it.slow_before, '#2f6fdb', 1.8, null, it.sung, y);
+  line(it.slow_after, '#e8731f', 1.8, null, it.sung, y);
+  line(it.gain, '#8a3fc8', 1.3, [5, 3], null, yg);
+  // 音素境界
+  g.strokeStyle = 'rgba(0,0,0,0.18)'; g.lineWidth = 1; g.fillStyle = '#556'; g.font = '10px sans-serif'; g.textAlign = 'center';
+  for (const b of it.bounds) {
+    const x0 = x(Math.min(b.x, n - 1)), x1 = x(Math.min(b.x2, n - 1));
+    g.beginPath(); g.moveTo(x0, Tm); g.lineTo(x0, Tm + ph); g.stroke();
+    if ($('showLabels').checked && x1 - x0 >= 13) g.fillText(b.ph, (x0 + x1) / 2, H - 8);
+  }
+  // 時間目盛（秒）
+  g.fillStyle = '#889'; g.textAlign = 'left'; g.fillText('0 s', L, Tm + ph + 10); g.textAlign = 'right'; g.fillText(it.dur_sec + ' s', W - R, Tm + ph + 10);
+}
+let resizeTimer = null;
+new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (S.resp) renderCards(); }, 150); }).observe($('cards'));
+
+// ── 音声情報（4 並列まで）────────────────────────────────────────────────────
+async function queueAudioInfo(items) {
+  const q = items.slice(); const token = S.resp;
+  const worker = async () => {
+    while (q.length) {
+      const it = q.shift(); if (S.resp !== token) return;
+      try {
+        const j = await get(`/audio_info?${dirQuery()}&name=${encodeURIComponent(it.name)}&${paramQuery(params())}`);
+        const card = [...$('cards').children].find(c => c.dataset.name === it.name); if (!card) continue;
+        const b = card.querySelector('.badges');
+        if (j.scale < 1) b.innerHTML += `<span class="badge warn">peak ${j.peak_after.toFixed(2)} → 両方 ×${j.scale.toFixed(2)}</span>`;
+        else b.innerHTML += `<span class="badge">peak ${j.peak_before.toFixed(2)} → ${j.peak_after.toFixed(2)}</span>`;
+      } catch (e) {
+        const card = [...$('cards').children].find(c => c.dataset.name === it.name);
+        if (card) card.querySelector('.badges').innerHTML += `<span class="badge err">${esc(e.message)}</span>`;
+      }
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+}
+
+// ── 再生（カードの原音/正規化ボタン + 連続再生）。プレイヤーは 1 つだけ＝同時に 1 音 ─────────
+const player = $('seq');
+const P = { name: null, which: null, seq: null, seqIdx: -1 };   // 今鳴らしているカードと種別、連続再生のリスト
+function cardOf(name) { return [...$('cards').children].find(c => c.dataset.name === name); }
+function markPlaying() {
+  for (const c of $('cards').children) {
+    const on = c.dataset.name === P.name && !player.paused;
+    c.classList.toggle('playing', on);
+    c.querySelectorAll('button.play').forEach(b => {
+      const mine = c.dataset.name === P.name && b.dataset.which === P.which;
+      b.classList.toggle('on', mine && !player.paused);
+      b.textContent = (mine && !player.paused ? '❚❚ ' : '▶ ') + (b.dataset.which === 'orig' ? '原音' : '正規化');
+    });
+  }
+}
+function playCard(it, which) {
+  const same = P.name === it.name && P.which === which;
+  if (same && !player.paused) { player.pause(); markPlaying(); return; }          // 同じボタン → 一時停止
+  if (same) { player.play().catch(() => {}); markPlaying(); return; }             // 同じボタン（停止中）→ 再開
+  const resume = (P.name === it.name && player.duration) ? player.currentTime : 0; // 原音⇄正規化は同じ位置から
+  P.seq = null; P.name = it.name; P.which = which;
+  player.src = audioUrl(it, which);
+  player.currentTime = 0;
+  const onMeta = () => { player.removeEventListener('loadedmetadata', onMeta); if (resume > 0 && resume < player.duration) player.currentTime = resume; };
+  player.addEventListener('loadedmetadata', onMeta);
+  player.play().catch(e => setStatus('再生できません: ' + e.message, true));
+  markPlaying();
+}
+player.addEventListener('timeupdate', () => {
+  const c = cardOf(P.name); if (!c) return;
+  const bar = c.querySelector('.bar i'), pos = c.querySelector('.pos');
+  if (bar && player.duration) bar.style.width = (player.currentTime / player.duration * 100) + '%';
+  if (pos) pos.textContent = `${player.currentTime.toFixed(1)} / ${(player.duration || 0).toFixed(1)} s`;
+});
+player.addEventListener('play', markPlaying);
+player.addEventListener('pause', markPlaying);
+player.addEventListener('ended', () => {
+  if (P.seq) { seqNext(); return; }
+  markPlaying();
+});
+function seqNext() {
+  P.seqIdx++;
+  if (!P.seq || P.seqIdx >= P.seq.length) { seqStop(); return; }
+  const it = P.seq[P.seqIdx]; P.name = it.name; P.which = 'norm';
+  player.src = audioUrl(it, 'norm'); player.play().catch(() => seqStop()); markPlaying();
+  const c = cardOf(it.name); if (c) c.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function seqStop() { player.pause(); P.seq = null; P.seqIdx = -1; markPlaying(); }
+$('btnSeq').onclick = () => { if (!S.resp) return; P.seq = S.resp.items.filter(it => it.has_audio); P.seqIdx = -1; seqNext(); };
+$('btnSeqStop').onclick = seqStop;
+
+// ── DB 全体の統計 ────────────────────────────────────────────────────────────
+function statsTable(res) {
+  const b = res.bands.before, a = res.bands.after;
+  const row = (k, v1, v2) => `<tr><td>${k}</td><td>${v1}</td><td>${v2}</td></tr>`;
+  return `<table class="stats"><thead><tr><th></th><th>正規化前</th><th>正規化後</th></tr></thead><tbody>
+    ${row('フレーズ間のレベル差 std [dB]', res.between_std.before, res.between_std.after)}
+    ${row('フレーズ平均音量 中央値 [dB]（p10–p90）', `${res.phrase_db.median_before} (${res.phrase_db.p10_before}–${res.phrase_db.p90_before})`, res.phrase_db.median_after)}
+    ${row('フレーズ内 遅い包絡 std 中央値 / p90 [dB]', `${res.inphrase_slow_std.before.median} / ${res.inphrase_slow_std.before.p90}`, `${res.inphrase_slow_std.after.median} / ${res.inphrase_slow_std.after.p90}`)}
+    ${row('macro（≥1 s）std 中央値 [dB]', b.macro, a.macro)}
+    ${row('meso（0.3–1 s）std 中央値 [dB]', b.meso, a.meso)}
+    ${row('micro（<0.3 s）std 中央値 [dB]', b.micro, a.micro)}
+    ${row('|ゲイン| p50 / p90 / p99 / max [dB]', '—', `${res.gain_abs.p50} / ${res.gain_abs.p90} / ${res.gain_abs.p99} / ${res.gain_abs.max}`)}
+    ${row('clamp に当たったフレーム', '—', res.clamp_pct + ' %')}
+    ${row('フレーズ数（除外後 / 全体）', `${res.n_phrases} / ${res.n_phrases_total}`, '')}
+  </tbody></table>
+  <div class="status">${res.elapsed_sec} s · この統計のパラメータ:</div>
+  <div class="yaml"><pre>${esc(yamlText(res.params))}</pre></div>`;
+}
+function showStats(res) {
+  $('statsOut').innerHTML = statsTable(res);
+  S.dbMedian = res.phrase_db.median_before; $('btnDbMedian').hidden = false;
+}
+async function statsStart() {
+  if (!S.sel) { $('statsStatus').textContent = 'データセットを選んでください'; return; }
+  clearInterval(S.statsTimer); $('statsOut').innerHTML = '';
+  try {
+    const j = await post('/stats_start', { dir: S.sel.dir, params: params() });
+    if (j.cached) { $('statsStatus').textContent = 'キャッシュ済みの結果'; $('statsProg').hidden = true; showStats(j.result); return; }
+    S.statsJob = j.job_id; $('statsProg').hidden = false; $('statsProg').value = 0;
+    S.statsTimer = setInterval(statsPoll, 1000);
+  } catch (e) { $('statsStatus').textContent = 'エラー: ' + e.message; }
+}
+async function statsPoll() {
+  try {
+    const j = await get('/stats_progress?job_id=' + S.statsJob);
+    $('statsProg').max = Math.max(1, j.total || 1); $('statsProg').value = j.done || 0;
+    $('statsStatus').textContent = `${j.state} ${j.done || 0}/${j.total || '?'} (${j.elapsed_sec} s)`;
+    if (j.state === 'done') { clearInterval(S.statsTimer); $('statsProg').hidden = true; showStats(j.result); }
+    else if (j.state === 'error' || j.state === 'cancelled') { clearInterval(S.statsTimer); $('statsProg').hidden = true; $('statsStatus').textContent = j.state + (j.error ? ': ' + j.error : ''); }
+  } catch (e) { clearInterval(S.statsTimer); $('statsStatus').textContent = 'エラー: ' + e.message; }
+}
+$('btnStats').onclick = statsStart;
+$('btnStatsCancel').onclick = () => post('/stats_cancel', {}).catch(() => {});
+$('btnDbMedian').onclick = () => { if (S.dbMedian != null) { $('p_target_db').value = S.dbMedian; showYaml(); run(1); } };
+
+// ── 配線 ─────────────────────────────────────────────────────────────────────
+$('btnScan').onclick = scan;
+$('btnRun').onclick = () => run(1);
+$('btnPageMedian').onclick = () => { if (S.resp && S.resp.page_median_db != null) { $('p_target_db').value = S.resp.page_median_db; showYaml(); run(1); } };
+$('btnReshuffle').onclick = () => { $('seed').value = Math.floor(Math.random() * 1e6); $('sort').value = 'shuffle'; run(1); };
+$('query').addEventListener('keydown', e => { if (e.key === 'Enter') run(1); });
+$('sort').onchange = () => run(1);
+$('pageSize').onchange = () => run(1);
+$('audioOnly').onchange = () => run(1);
+$('showMel').onchange = () => { if (S.resp) renderCards(); };
+$('showLabels').onchange = () => { if (S.resp) renderCards(); };
+
+// 起動時に --data が渡されていればそのままスキャンする。無ければ入力を待つ
+loadConfig().then(() => { if (S.cfg.data_dirs && S.cfg.data_dirs.length) return scan(); setStatus('データセットのフォルダを入れて Scan'); })
+  .catch(e => setStatus('エラー: ' + e.message, true));
+</script>
+</body>
+</html>

@@ -134,4 +134,4 @@ data:
     target_db: -30.0      #   crescendi) and keeps note-level and phonetic dynamics, so the model sings
     k: 1.0                #   at a constant level whatever the score. target = frame loudness
     max_gain_db: 12.0     #   20*log10(mean_bins exp(mel)) every phrase is brought to. Tune with
-    max_cut_db: 12.0      #   research/loudness_tuner before changing.
+    max_cut_db: 12.0      #   tools/loudness_tuner before changing.

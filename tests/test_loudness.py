@@ -59,3 +59,35 @@ def test_wav_gain_matches_mel_gain():
     assert w2.shape == wav.shape
     assert np.isclose(w2[0] / wav[0], 10 ** (-6 / 20), atol=1e-4)
     assert np.isclose(w2[-1] / wav[-1], 10 ** (6 / 20), atol=1e-4)
+
+
+def test_mel_gain_stops_at_the_floor():
+    T = 50
+    mel = np.full((128, T), L.MEL_FLOOR, np.float32)
+    m2 = L.apply_gain_mel(mel, np.full(T, -10.0))
+    assert np.all(m2 >= np.float32(L.MEL_FLOOR))                       # 床より下へは行かない
+    m3 = L.apply_gain_mel(mel, np.full(T, 10.0))
+    assert np.allclose(L.frame_db(m3) - L.frame_db(mel), 10.0, atol=1e-3)
+
+
+def test_decompose_splits_the_envelope_into_bands():
+    T = 6000
+    t = np.arange(T) / FR
+    macro = 2.0 * np.sin(2 * np.pi * t / 20.0)           # σ_long=1 s でほぼ全部 macro に入る周期
+    micro = 5.0 * np.sin(2 * np.pi * t * 6.0)
+    E = -30.0 + macro + micro
+    d = L.decompose(E, np.ones(T, bool), FR, sigma_long=1.0, sigma_short=0.3)
+    assert abs(d["mean_db"] + 30.0) < 0.2
+    assert abs(d["macro_std"] - macro.std()) < 0.3
+    assert abs(d["micro_std"] - micro.std()) < 0.6
+    assert d["meso_std"] < 0.5
+
+
+def test_pau_mask_follows_the_phoneme_bounds():
+    ph = np.array([0, 5, 6, 0])
+    dur = np.array([0.5, 0.3, 0.2, 0.4])
+    T = int(round(dur.sum() * FR))
+    m = L.pau_mask(ph, dur, T, FR, pau_id=0)
+    fb = L.phoneme_bounds(dur, T, FR)
+    assert m[:fb[1]].all() and not m[fb[1]:fb[3]].any() and m[fb[3]:].all()
+    assert fb[-1] == T
