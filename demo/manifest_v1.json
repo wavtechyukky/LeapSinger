@@ -1,0 +1,134 @@
+{
+ "tag": "v1",
+ "label": "V1",
+ "release": "v0.1.0",
+ "recipe": "flow + GAN, 1 step",
+ "vocoder": "NHVSing V3.2 (checkpoints/nhv_v3_2.onnx)",
+ "audio_suffix": "synth",
+ "img_suffix": "",
+ "score_suffix": "",
+ "speakers": [
+  {
+   "id": "oniku",
+   "name": "Oniku Kurumi",
+   "phrases": [
+    {
+     "name": "fujino_yama_0000",
+     "split": "train",
+     "sec": 5.5,
+     "mel_l1": 1.049
+    },
+    {
+     "name": "hamabeno_uta_0003",
+     "split": "train",
+     "sec": 6.7,
+     "mel_l1": 0.904
+    },
+    {
+     "name": "kachushano_uta_0005",
+     "split": "train",
+     "sec": 5.2,
+     "mel_l1": 0.768
+    },
+    {
+     "name": "sakura_sakura_0001",
+     "split": "eval",
+     "sec": 5.7,
+     "mel_l1": 1.306
+    },
+    {
+     "name": "sakura_sakura_0006",
+     "split": "eval",
+     "sec": 5.8,
+     "mel_l1": 1.388
+    }
+   ]
+  },
+  {
+   "id": "natsume",
+   "name": "Natsume Yuuri",
+   "phrases": [
+    {
+     "name": "12_0001",
+     "split": "train",
+     "sec": 3.8,
+     "mel_l1": 0.817
+    },
+    {
+     "name": "1_0012",
+     "split": "train",
+     "sec": 4.8,
+     "mel_l1": 0.797
+    },
+    {
+     "name": "23_0002",
+     "split": "train",
+     "sec": 4.7,
+     "mel_l1": 0.983
+    },
+    {
+     "name": "46_0006",
+     "split": "eval",
+     "sec": 4.7,
+     "mel_l1": 0.792
+    },
+    {
+     "name": "46_0016",
+     "split": "eval",
+     "sec": 5.0,
+     "mel_l1": 1.112
+    }
+   ]
+  },
+  {
+   "id": "ritsu",
+   "name": "Namine Ritsu",
+   "phrases": [
+    {
+     "name": "FACE_0000",
+     "split": "train",
+     "sec": 4.8,
+     "mel_l1": 0.859
+    },
+    {
+     "name": "byebye_aimai_sound_0009",
+     "split": "train",
+     "sec": 4.7,
+     "mel_l1": 0.659
+    },
+    {
+     "name": "dokomademomukuni_0000",
+     "split": "train",
+     "sec": 3.9,
+     "mel_l1": 0.843
+    },
+    {
+     "name": "FlashBlack_0004",
+     "split": "eval",
+     "sec": 4.2,
+     "mel_l1": 0.859
+    },
+    {
+     "name": "night_shief_0002",
+     "split": "eval",
+     "sec": 5.5,
+     "mel_l1": 0.93
+    }
+   ]
+  }
+ ],
+ "scores": [
+  {
+   "key": "furusato",
+   "title": "Furusato · ふるさと"
+  },
+  {
+   "key": "haru_no_ogawa",
+   "title": "Haru no Ogawa · 春の小川"
+  },
+  {
+   "key": "kirakira_boshi",
+   "title": "Kirakiraboshi · きらきら星"
+  }
+ ]
+}

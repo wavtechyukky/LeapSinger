@@ -1,0 +1,139 @@
+{
+ "tag": "v2",
+ "label": "V2",
+ "release": "v2.0.0",
+ "recipe": "GAN-free rectified-flow teacher distilled into a 1-step student",
+ "vocoder": "NHVSing V3.2.1 (checkpoints/nhv_v3_2_1.onnx)",
+ "audio_suffix": "v2",
+ "img_suffix": "_v2",
+ "score_suffix": "_v2",
+ "ckpt": "ckpt_020000.pt",
+ "steps": 1,
+ "seed": 0,
+ "mel_l1_note": "mel_l1_target is the L1 to the training target (the loudness-corrected GT mel), not comparable with V1's mel_l1 against the raw GT",
+ "speakers": [
+  {
+   "id": "oniku",
+   "name": "Oniku Kurumi",
+   "phrases": [
+    {
+     "name": "fujino_yama_0000",
+     "split": "train",
+     "sec": 5.5,
+     "mel_l1_target": 0.37
+    },
+    {
+     "name": "hamabeno_uta_0003",
+     "split": "train",
+     "sec": 6.7,
+     "mel_l1_target": 0.372
+    },
+    {
+     "name": "kachushano_uta_0005",
+     "split": "train",
+     "sec": 5.3,
+     "mel_l1_target": 0.344
+    },
+    {
+     "name": "sakura_sakura_0001",
+     "split": "eval",
+     "sec": 5.7,
+     "mel_l1_target": 0.48
+    },
+    {
+     "name": "sakura_sakura_0006",
+     "split": "eval",
+     "sec": 5.8,
+     "mel_l1_target": 0.498
+    }
+   ]
+  },
+  {
+   "id": "natsume",
+   "name": "Natsume Yuuri",
+   "phrases": [
+    {
+     "name": "12_0001",
+     "split": "train",
+     "sec": 3.8,
+     "mel_l1_target": 0.29
+    },
+    {
+     "name": "1_0012",
+     "split": "train",
+     "sec": 4.8,
+     "mel_l1_target": 0.283
+    },
+    {
+     "name": "23_0002",
+     "split": "train",
+     "sec": 4.7,
+     "mel_l1_target": 0.329
+    },
+    {
+     "name": "46_0006",
+     "split": "eval",
+     "sec": 4.7,
+     "mel_l1_target": 0.492
+    },
+    {
+     "name": "46_0016",
+     "split": "eval",
+     "sec": 5.0,
+     "mel_l1_target": 0.582
+    }
+   ]
+  },
+  {
+   "id": "ritsu",
+   "name": "Namine Ritsu",
+   "phrases": [
+    {
+     "name": "FACE_0000",
+     "split": "train",
+     "sec": 4.8,
+     "mel_l1_target": 0.481
+    },
+    {
+     "name": "byebye_aimai_sound_0009",
+     "split": "train",
+     "sec": 4.7,
+     "mel_l1_target": 0.491
+    },
+    {
+     "name": "dokomademomukuni_0000",
+     "split": "train",
+     "sec": 3.9,
+     "mel_l1_target": 0.432
+    },
+    {
+     "name": "FlashBlack_0004",
+     "split": "eval",
+     "sec": 4.2,
+     "mel_l1_target": 0.572
+    },
+    {
+     "name": "night_shief_0002",
+     "split": "eval",
+     "sec": 5.5,
+     "mel_l1_target": 0.612
+    }
+   ]
+  }
+ ],
+ "scores": [
+  {
+   "key": "furusato",
+   "title": "Furusato · ふるさと"
+  },
+  {
+   "key": "haru_no_ogawa",
+   "title": "Haru no Ogawa · 春の小川"
+  },
+  {
+   "key": "kirakira_boshi",
+   "title": "Kirakiraboshi · きらきら星"
+  }
+ ],
+ "scores_note": "The same excerpt as V1 (from the first note, the same length). F0 and phoneme durations come from the current pitch and duration models, so the difference from V1 in this section is not only the acoustic model. Vocoder NHVSing V3.2.1."
+}
