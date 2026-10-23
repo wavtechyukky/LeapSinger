@@ -11,6 +11,7 @@ LeapSinger is a diffusion-style **acoustic model** for singing voice. It runs ve
 ### What changed in V2 (2.0.0)
 
 - **No GAN.** A teacher solves the flow in 16 steps; a 1-step student is then distilled from the teacher's start/output pairs (a second rectified flow, "reflow"). Inference is still one step, the harmonics are cleaner than the GAN model's, and the spectra of voiceless consonants are closer to the recordings. The released model (`3singer_v2_student.pt`) is this student.
+- **A steeper harmonic slope in the pseudo-mel**, 1/k^1.5 (v0.1.0: 1/k). Less harmonic residue is left in voiceless consonants, so consonants come out clearer. The white-noise amount stays at 0.05 (the A/B is under [Architecture](#architecture)).
 - **A "loose" loudness correction of the training mel** (`data.loudness_agc`). It removes phrase-to-phrase level differences and slow crescendi from the training target while keeping the singing expression as far as possible, so the model sings at a constant level whatever the score. The values are chosen with the bundled [loudness-correction tuner](#loudness-correction-tuner).
 - **Relative position inside each phoneme** as a condition (`model.pos_cond`), as used in DiffSinger. It gave no significant quality gain on the Japanese singers, but there was no reason to drop it either, so it stays.
 - **Language packs** (`dict/<language>.yaml`) and `tools/convert_labels.py` for other label formats. Dictionaries, recipes and configs for English, Korean and Mandarin are included (models: Japanese only).
@@ -99,6 +100,10 @@ The flow in the figure above is:
 5. **NHVSing** — a high-quality neural vocoder that turns the mel into audio (a waveform), at RTF under 0.1 on CPU. https://github.com/wavtechyukky/NHVSing/
 
 The pseudo-mel lets you tune the harmonic decay, the number of harmonics, and the strength of the white noise. That said, after much testing, stacking the impulse's harmonics all the way up to the Nyquist frequency gives the best quality.
+
+### The harmonic slope and the noise amount of the pseudo-mel
+
+The v0.1.0 pseudo-mel was 256 harmonics with amplitudes 1/k (−6 dB/oct) plus white noise at 0.05 of the harmonic RMS. V2 **steepens the slope to 1/k^1.5 (`excitation.harm_decay: 1.5`) and keeps the noise at 0.05** (`excitation.x0_sigma`, Gaussian noise added on the log-mel, is 0). The values were settled by A/B tests over a range of settings.
 
 ## Usage
 
