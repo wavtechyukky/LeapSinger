@@ -14,30 +14,13 @@ from __future__ import annotations
 
 import os
 
+from leapsinger.phonemes import load_phonemes  # noqa: F401  (one reader for preprocess and the language packs)
+
 _DICT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dict")
 DEFAULT_PHONEMES_PATH = os.path.join(_DICT_DIR, "ja.phonemes")
 
 # tokens treated as silence for cut/fade (cl is voiced -> not silence). Language-independent.
 SILENCE_TOKENS = frozenset({"pau"})
-
-
-def load_phonemes(path: str) -> list[str]:
-    """Read a phoneme-list file -> ordered list. One phoneme per line; blank lines and text
-    after '#' are ignored. The order defines the id (first entry = id 0)."""
-    out: list[str] = []
-    with open(path, encoding="utf-8") as f:
-        for ln in f:
-            ln = ln.split("#", 1)[0].strip()
-            if ln:
-                out.append(ln)
-    if not out:
-        raise ValueError(f"no phonemes found in {path}")
-    if out[0] != "pau":
-        raise ValueError(f"{path}: id 0 must be 'pau' (silence/pad), got {out[0]!r}")
-    if len(set(out)) != len(out):
-        dup = sorted({p for p in out if out.count(p) > 1})
-        raise ValueError(f"{path}: duplicate phonemes {dup}")
-    return out
 
 
 class Vocab:

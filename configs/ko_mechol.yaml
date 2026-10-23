@@ -1,0 +1,98 @@
+# Korean singing model, Mechol only (a teenage man, ~52 min) — the GAN-free reflow teacher (the recipe adopted for
+# Japanese). The voice meant for the SVS; configs/ko_mechol_sodasoo.yaml adds SODAsoo to cover Mechol's weak range.
+# Phoneme list dict/ko_coda.phonemes (language pack dict/ko_coda.yaml): Team CODA's romanisation. PrettyPitch's Korean
+# F0 and consonant-duration models (dict/ko.phonemes there) use the same phoneme list and the same speaker id 0.
+# Research only: Mechol-001 (part of this data) is under the Sds-Korean-Singing-Dataset terms (ask before distributing
+# a model with the data's characteristics; no commercial use); the rest was given to us privately.
+#
+# 0. Labels and audio: /Volumes/ssd2t/singing_database/_leapsinger_labels/mechol52 (configs/recipes/mechol52.yaml).
+# 1. Preprocess (locally; RMVPE on CPU, one recipe at a time — never in parallel):
+#      python -m preprocess.run --recipe configs/recipes/mechol52.yaml         # -> data/mechol52
+#    The shards (shard.npz + metadata.json) are kept in research/leapsinger_data/<db>/.
+# 2. Teacher (16-step flow, no GAN), then the 1-step student from its pairs:
+#      python -m train --config configs/ko_mechol.yaml --data_dirs <data>/mechol52 \
+#          --run_name ko_mechol_teacher --out_root <log> --device cuda
+#      python -m train --config configs/ko_mechol.yaml --data_dirs (same) --run_name ko_mechol_student \
+#          --out_root <log> --device cuda --max_updates 20000 \
+#          --set train.reflow_teacher=<log>/ko_mechol_teacher/ckpt_<best>.pt --set train.reflow_teacher_steps=16 \
+#          --set train.num_steps=1 --set train.lr=2.0e-4
+#    configs/ko_teacher.yaml (0.69 h) overfit from about 6k: pick the checkpoint by the eval loss and by ear.
+mel:
+  sr: 44100
+  hop: 256
+  n_fft: 2048
+  win: 2048
+  n_mels: 128
+  fmin: 40.0
+  fmax: 16000.0
+model:
+  hidden: 256
+  backbone_ch: 256
+  n_cycles: 3
+  dilation_schedule: pow2_15
+  encoder_type: attn
+  spk_dim: 32
+  n_speakers: 1
+  n_styles: 0
+  use_uv: false
+  flow_loss: l2
+  mel_vmin: -11.5
+  mel_vmax: 2.0
+  pos_cond:
+    phoneme: true
+    encoding: sinusoidal
+    unit: false
+    bins: 8
+                          # nucleus: not set -> the language pack's vowels
+  dur_cond: false
+excitation:
+  n_harm: 256
+  noise_ratio: 0.05
+  exc_scale: 0.15
+  harm_decay: 1.5
+  x0_sigma: 0.0
+train:
+  lr: 8.0e-4
+  grad_clip: 1.0
+  optimizer: radam
+  lr_decay: 0.8
+  lr_decay_steps: 5000
+  amp: bf16
+  amp_fp32_io: true
+  max_updates: 50000      # the length of the adopted Japanese teacher; checkpoints every 1000 to pick from
+  max_batch_frames: 120000
+  max_batch_size: 64
+  min_batch_items: 16
+  recon_weight: 0.5
+  flow_loss: l2
+  cons_weight: 1.0
+  cons_weight_next_ms: 30
+  num_steps: 16
+  save_interval: 1000
+  log_interval: 50
+  eval_interval: 2000
+  eval_items: 3
+  eval_gen_metrics: true
+  vocoder: checkpoints/nhv_v3_2_1.onnx   # trained on Japanese voices: listen to the vocoded GT (spk*/s*_gt) first
+  num_workers: 4
+  pitch_aug: false
+  balance_speakers: false
+gan:
+  enabled: false
+data:
+  spk_map:
+    mechol52: 0           # Mechol = 0 in every Korean model (PrettyPitch too)
+  # Two ~1-min pieces are held out (seed 42). The long recording is cut into pieces, so other pieces of the same
+  # song stay in training.
+  eval_dbs: [mechol52]
+  eval_songs: 2
+  min_sec: 0.3
+  max_sec: 30
+  silence: true
+  silence_fade_sec: 0.05
+  loudness_agc:
+    sigma_sec: 1.0
+    target_db: -30.0
+    k: 1.0
+    max_gain_db: 12.0
+    max_cut_db: 12.0

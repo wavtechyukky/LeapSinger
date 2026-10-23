@@ -18,14 +18,22 @@ result loads and runs in stock ORT.
 
 `simplify()` is best-effort (skipped with a log if onnxsim is absent/fails); `to_fp16()` is what
 matters for the deliverable.
+
+The last pass, `to_harmonic_loop` (export/harmonic_loop.py), folds the excitation's unrolled
+harmonic sum (n_harm straight-line blocks) into one ONNX `Loop`: bit-identical output, ~5x lower
+peak memory in every ORT and a much faster session creation. It only touches the fp32 `/exc`
+region, so it runs after fp16 and is independent of it.
 """
 from __future__ import annotations
 
 import os
+import shutil
 
 import numpy as np
 import onnx
 from onnx import TensorProto, helper, numpy_helper
+
+from .harmonic_loop import HarmonicSumNotFound, to_harmonic_loop
 
 
 def simplify(path_in: str, path_out: str | None = None) -> str:
@@ -303,8 +311,12 @@ def to_native_dft(path_in: str, path_out: str, *, n_fft: int = 2048) -> str:
 
 
 def finalize(path_fp32: str, path_out: str, *, fp16: bool = True, do_simplify: bool = True,
-             native_dft: bool = False) -> str:
-    """simplify -> native DFT -> fp16 (each optional) -> a single path_out."""
+             native_dft: bool = False, harmonic_loop: bool = True, unrolled_out: str | None = None) -> str:
+    """simplify -> native DFT -> fp16 -> harmonic Loop (each optional) -> a single path_out.
+    `harmonic_loop` folds the excitation's unrolled harmonic sum into one ONNX `Loop` (see
+    export/harmonic_loop.py); it fails loudly if the graph does not have the expected chain, so
+    a changed excitation cannot silently ship the memory-hungry unrolled form. `unrolled_out`
+    keeps a copy of the graph from just before that pass, for verify.verify_harmonic_loop."""
     src = simplify(path_fp32) if do_simplify else path_fp32
     ndft_tmp = None
     if native_dft:
@@ -312,6 +324,18 @@ def finalize(path_fp32: str, path_out: str, *, fp16: bool = True, do_simplify: b
         src = to_native_dft(src, ndft_tmp)
     if fp16:
         src = to_fp16(src, path_out)
+    if harmonic_loop:
+        if unrolled_out:
+            shutil.copyfile(src, unrolled_out)
+        try:
+            info = to_harmonic_loop(src, path_out)
+        except HarmonicSumNotFound as e:
+            raise SystemExit(f"[postprocess] harmonic loop: {e}\n(pass harmonic_loop=False / --no-harmonic-loop "
+                             "to keep the unrolled chain)") from e
+        print(f"[postprocess] harmonic loop: {info['n_harm']} harmonics -> one Loop; nodes "
+              f"{info['nodes_before']} -> {info['nodes_after']}, initializers "
+              f"{info['initializers_before']} -> {info['initializers_after']}")
+        src = path_out
     if src != path_out:
         onnx.save(onnx.load(src), path_out)
     if ndft_tmp and ndft_tmp != path_out and os.path.exists(ndft_tmp):

@@ -1,0 +1,14 @@
+# 言語パック: 英語（en_full.phonemes。手持ちの英語のデータセット 7 つを全部読める版）
+#
+# 書き方と使われ方は ja.yaml と同じ。子音 = vowels にも silence にも入らない音素すべて
+# （cl・音節を担う el / en・声の効果の vf / vk / vg / qh も子音）。
+
+phonemes: en_full.phonemes
+vowels: [aa, ae, ah, ao, aw, ay, eh, er, ey, ih, iy, ow, oy, uh, uw, ax, oh]
+silence: [pau, sil, sp, br, SP, AP]      # どれも前処理で pau に置き換わる
+
+# ── 評価用（tools/eval_ab.py）────────────────────────────────────────────────
+# どれにも入らない子音は「その他」（cl、声の効果の vf / vk / vg / qh）
+voiceless: [p, t, k, ch, f, th, s, sh, hh, q, tr]
+voiced: [b, d, g, jh, v, dh, z, zh, m, n, ng, l, r, w, y, dx, dr, el, en, rr]
+steady_vowels: [aa, ae, ah, ao, eh, er, ih, iy, uh, uw, ax, oh]   # 二重母音（aw ay ey ow oy）は動くので外す

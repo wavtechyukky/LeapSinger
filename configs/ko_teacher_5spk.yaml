@@ -1,0 +1,118 @@
+# Result (2026-10-20, run ko5_teacher): WORSE than configs/ko_teacher.yaml by ear. Suspected: GTSinger's phone
+# labels (~15 % of voicing boundaries off by > 50 ms, vs 3–5 % for SODAsoo). Not ruled out: the IPA -> CODA
+# conversion (the positional coda rule), mixing studio (GTSinger) with home recordings (Sds), and SODAsoo's smaller
+# share of batches with five voices balanced. Kept as a config only; GTSinger is not used for now.
+#
+# Korean singing model, five speakers — the GAN-free reflow teacher (the recipe adopted for Japanese). The same
+# model as configs/ko_teacher.yaml (two speakers, ~0.69 h) plus GTSinger's three Korean singers (~3.6 h), so the two
+# runs show what the extra data buys.
+#   0 sds_mechol001   Mechol-001, a teenage man         31.5 min   (Sds-Korean-Singing-Dataset, SODAsoo's)
+#   1 sds_sodasoo001  SODAsoo-001, an adult woman       10.1 min   (Sds-Korean-Singing-Dataset)
+#   2 gts_ko_s1       GTSinger KO-Soprano-1, a woman    23.8 min   (GTSinger, CC BY-NC-SA 4.0)
+#   3 gts_ko_s2       GTSinger KO-Soprano-2, a woman    68.9 min
+#   4 gts_ko_t1       GTSinger KO-Tenor-1, a man       124.4 min
+# GTSinger: only the Control_Group (plain singing) is used, as style 0 like every other voice; the technique groups
+# and the paired speech are not. Its IPA labels are converted to Team CODA (tools/convert_labels.py gtsinger), and the
+# segments whose labels are off the audio (|lag| >= 40 ms or voicing agreement < 0.8, ~5 %) are left out.
+# Phoneme list dict/ko_coda.phonemes (language pack dict/ko_coda.yaml): Team CODA's romanisation.
+# Research only: the Sds terms (2026-10-18) require asking before distributing a model with the data's
+# characteristics, and forbid commercial use; GTSinger is non-commercial and share-alike.
+#
+# 0. Labels and audio: /Volumes/ssd2t/singing_database/_leapsinger_labels/<db> (see each recipe).
+# 1. Preprocess (locally; RMVPE on CPU, one recipe at a time — never in parallel). The shards (shard.npz +
+#    metadata.json) are kept in research/leapsinger_data/<db>/.
+# 2. Teacher (16-step flow, no GAN), then the 1-step student from its pairs:
+#      python -m train --config configs/ko_teacher_5spk.yaml --data_dirs <data>/sds_mechol001 <data>/sds_sodasoo001 \
+#          <data>/gts_ko_s1 <data>/gts_ko_s2 <data>/gts_ko_t1 --run_name ko5_teacher --out_root <log> --device cuda
+#      python -m train --config configs/ko_teacher_5spk.yaml --data_dirs (same) --run_name ko5_student \
+#          --out_root <log> --device cuda --max_updates 20000 \
+#          --set train.reflow_teacher=<log>/ko5_teacher/ckpt_<best>.pt --set train.reflow_teacher_steps=16 \
+#          --set train.num_steps=1 --set train.lr=2.0e-4
+mel:
+  sr: 44100
+  hop: 256
+  n_fft: 2048
+  win: 2048
+  n_mels: 128
+  fmin: 40.0
+  fmax: 16000.0
+model:
+  hidden: 256
+  backbone_ch: 256
+  n_cycles: 3
+  dilation_schedule: pow2_15
+  encoder_type: attn
+  spk_dim: 32
+  n_speakers: 5
+  n_styles: 0
+  use_uv: false
+  flow_loss: l2
+  mel_vmin: -11.5
+  mel_vmax: 2.0
+  pos_cond:
+    phoneme: true
+    encoding: sinusoidal
+    unit: false
+    bins: 8
+                          # nucleus: not set -> the language pack's vowels
+  dur_cond: false
+excitation:
+  n_harm: 256
+  noise_ratio: 0.05
+  exc_scale: 0.15
+  harm_decay: 1.5
+  x0_sigma: 0.0
+train:
+  lr: 8.0e-4
+  grad_clip: 1.0
+  optimizer: radam
+  lr_decay: 0.8
+  lr_decay_steps: 5000
+  amp: bf16
+  amp_fp32_io: true
+  max_updates: 50000      # the length of the adopted Japanese teacher; checkpoints every 1000 to pick from
+  max_batch_frames: 120000
+  max_batch_size: 64
+  min_batch_items: 16
+  recon_weight: 0.5
+  flow_loss: l2
+  cons_weight: 1.0
+  cons_weight_next_ms: 30
+  num_steps: 16
+  save_interval: 1000
+  log_interval: 50
+  eval_interval: 2000
+  eval_items: 3
+  eval_gen_metrics: true
+  vocoder: checkpoints/nhv_v3_2_1.onnx   # trained on Japanese voices: listen to the vocoded GT (spk*/s*_gt) first
+  num_workers: 4
+  pitch_aug: false
+  balance_speakers: true  # every voice equally often (as in configs/ko_teacher.yaml). The amounts differ 12-fold
+                          #   (SODAsoo 10 min .. Tenor-1 124 min), so SODAsoo is repeated far more often; false = in
+                          #   proportion to the data (Tenor-1 would be over half of every batch)
+gan:
+  enabled: false
+data:
+  spk_map:
+    sds_mechol001: 0      # man
+    sds_sodasoo001: 1     # woman
+    gts_ko_s1: 2          # woman
+    gts_ko_s2: 3          # woman
+    gts_ko_t1: 4          # man
+  # One "song" per voice is held out (seed 42): mechol_natural_s020 (~1 min), SODAsoo's modugananeul (79 s),
+  # gts_ko_s1_song40_s000 (45 s), gts_ko_s2_song12_s009 (47 s), gts_ko_t1_song02_s005 (59 s). The same two Sds songs
+  # as configs/ko_teacher.yaml, so the two runs' evaluations on those voices compare directly.
+  # GTSinger's songs (and Mechol's one file) are cut into ~1-min pieces for RMVPE's memory, so a held-out piece's other
+  # pieces of the same song stay in training (the melody and singer are seen; the lyrics of that piece are not).
+  eval_dbs: [sds_mechol001, sds_sodasoo001, gts_ko_s1, gts_ko_s2, gts_ko_t1]
+  eval_songs: 1
+  min_sec: 0.3
+  max_sec: 30
+  silence: true
+  silence_fade_sec: 0.05
+  loudness_agc:
+    sigma_sec: 1.0
+    target_db: -30.0
+    k: 1.0
+    max_gain_db: 12.0
+    max_cut_db: 12.0

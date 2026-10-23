@@ -1,0 +1,14 @@
+# 言語パック: 中国語（zh_opencpop.phonemes。Opencpop の声母 + 韻母）
+#
+# 書き方と使われ方は ja.yaml と同じ。母音 = 韻母すべて（介音・鼻音の韻尾を含む 1 つの音素）、子音 = 声母（y w も）。
+
+phonemes: zh_opencpop.phonemes
+vowels: [a, o, e, ai, ei, ao, ou, an, en, ang, eng, ong, er, i, u, v, ia, ie, iao, iu, ian, in, iang, ing, iong,
+         ua, uo, uai, ui, uan, un, uang, ve, van, vn, ir, i0]
+silence: [pau, SP, AP]                   # SP・AP は前処理で pau に置き換わる
+
+# ── 評価用（tools/eval_ab.py）────────────────────────────────────────────────
+# 普通話の b d g j zh z は無気の無声音
+voiceless: [b, p, d, t, g, k, f, h, j, q, x, zh, ch, sh, z, c, s]
+voiced: [m, n, l, r, y, w]
+steady_vowels: [a, o, e, i, u, v, er, ir, i0]   # 介音や韻尾で動く韻母は外す

@@ -1,0 +1,55 @@
+# 音素インベントリ: 韓国語（Team CODA の DiffSinger 韓国語の表記）
+#
+# id = 行順、id 0 は pau（pad / 無音）。行を挿入・並べ替えしないこと。足すときは末尾へ。
+# 表記: https://github.com/Coda-SVS/diffsinger-korean-support の PHONEMES.md。大文字と小文字は別の音素
+# （初声は小文字、終声＝パッチムは大文字。n は初声の ㄴ、N は終声の ㄴ）。音節は (初声)(わたり音)母音(終声)。
+# 対象: Sds-Korean-Singing-Dataset の Mechol-001・SODAsoo-001。
+# 無音・息（SP AP exh trash）と書き間違いは、各レシピの phon_norm で写す（configs/recipes/）。
+
+pau                 # 0: silence / pad
+
+# 初声 18
+g                   # ㄱ 平音
+kk                  # ㄲ 濃音
+k                   # ㅋ 激音
+n                   # ㄴ
+d                   # ㄷ 平音
+tt                  # ㄸ 濃音
+t                   # ㅌ 激音
+r                   # ㄹ
+m                   # ㅁ
+b                   # ㅂ 平音
+pp                  # ㅃ 濃音
+p                   # ㅍ 激音
+s                   # ㅅ
+ss                  # ㅆ 濃音
+j                   # ㅈ 平音
+jj                  # ㅉ 濃音
+ch                  # ㅊ 激音
+h                   # ㅎ
+
+# わたり音 2
+y                   # ㅑ ㅕ ㅛ ㅠ ㅖ ㅒ の y
+w                   # ㅘ ㅝ ㅚ ㅙ ㅞ ㅟ の w
+
+# 母音 7
+a                   # ㅏ
+eo                  # ㅓ
+o                   # ㅗ
+u                   # ㅜ
+eu                  # ㅡ
+i                   # ㅣ
+e                   # ㅔ・ㅐ（まとめて 1 つ）
+
+# 終声 7（パッチムの 7 代表音）
+K                   # ㄱ 系
+N                   # ㄴ
+T                   # ㄷ・ㅅ・ㅆ・ㅈ・ㅊ・ㅌ・ㅎ 系
+L                   # ㄹ
+M                   # ㅁ
+P                   # ㅂ・ㅍ 系
+NG                  # ㅇ
+
+# そのほか
+vf                  # ボーカルフライ（エッジボイス）
+cl                  # 閉鎖

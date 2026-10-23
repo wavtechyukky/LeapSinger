@@ -29,11 +29,15 @@ def _build_from_config(cfg: dict, device):
         n_cycles=cfg.get("n_cycles", 3), dilation_schedule=cfg.get("dilation_schedule", "pow2_15"),
         n_styles=cfg.get("n_styles", 0), flow_loss=cfg.get("flow_loss", "l2"),
         use_uv=cfg.get("use_uv", True),
+        # 相対位置 / 音素長の条件（古い ckpt には無い → 既定 off）
+        pos_cond=cfg.get("pos_cond"), dur_cond=cfg.get("dur_cond", False),
+        nucleus_ids=cfg.get("nucleus_ids"), pau_id=cfg.get("pau_id", 0),
     )
     harm = dict(
         n_harm=cfg.get("n_harm", 50),
         noise_ratio=cfg.get("noise_ratio", 0.05), exc_scale=cfg.get("exc_scale", 0.15),
         harm_decay=cfg.get("harm_decay", 1.0), exc_hop=cfg.get("exc_hop", cfg.get("hop", 256)),
+        x0_sigma=cfg.get("x0_sigma", 0.0),           # reflow の教師・生徒の確率的な出発点（古い ckpt は 0）
     )
     if cfg.get("arch") == "harmonic_multispk":
         model = HarmonicAcousticModelMultiSpk(

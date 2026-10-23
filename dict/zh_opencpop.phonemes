@@ -1,0 +1,75 @@
+# 音素インベントリ: 中国語（普通話。Opencpop の表記 = 声調なしの拼音を声母と韻母に分けたもの）
+#
+# id = 行順、id 0 は pau（pad / 無音）。行を挿入・並べ替えしないこと。足すときは末尾へ。
+# 韻母は 1 つの音素（wei = w ei、mang = m ang）。韻母の中をさらに分けた辞書を作るなら別のファイルにする。
+# i は [i] と舌尖母音の両方を表す（Opencpop のまま）。舌尖母音を分けた ir（zhi chi shi ri）と i0（zi ci si）も持つ
+# （DiffSinger の opencpop-strict と同じ分け方）。どちらを使うかはラベルの変換で決める（tools/convert_labels.py）。
+# 無音（SP）と息（AP）はレシピの phon_norm で pau に写す（configs/recipes/）。
+
+pau                 # 0: silence / pad
+
+# 声母 23（y w はゼロ声母の綴り）
+b
+p
+m
+f
+d
+t
+n
+l
+g
+k
+h
+j
+q
+x
+zh
+ch
+sh
+r
+z
+c
+s
+y
+w
+
+# 韻母 35（Opencpop に出てくるもの。v = ü）
+a
+o
+e
+ai
+ei
+ao
+ou
+an
+en
+ang
+eng
+ong
+er
+i
+u
+v
+ia
+ie
+iao
+iu
+ian
+in
+iang
+ing
+iong
+ua
+uo
+uai
+ui
+uan
+un
+uang
+ve
+van
+vn
+
+# 舌尖母音（i を分けたもの）
+ir                  # zhi chi shi ri の i
+i0                  # zi ci si の i

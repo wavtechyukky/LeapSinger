@@ -1,0 +1,23 @@
+# Recipe: Kumi AI Dataset（筆音クミ、Cubialpha）。40 曲中、ラベルがあるのは 20 曲（1.17 h）。
+# 音源の規約で AI の学習は許可なしで可（名前とキャラクターを変えないこと）。96 kHz / 192 kHz ステレオ（読み込みで 44.1 kHz モノラル）。
+# lab の名前は wav と違う（<曲>_Labeled_by_<担当>.lab）が、フォルダの中の唯一の .lab が使われる。ラベルの無い曲は [MISS lab] で飛ばす。
+# el = 音節を担う l（辞書にある）。j・an・ik は y・ae・ih の書き間違い。
+name: kumi
+phonemes: dict/en_full.phonemes
+spk_id: 25                 # train.py の既定（config の data.spk_map が優先）
+style_id: 0
+lab_unit: "100ns"
+save_wav: false
+
+layout: per_song
+db_root: "/Volumes/ssd2t/singing_database/en/Kumi AI Dataset"
+wav: "{song}/{song}.wav"
+lab: "{song}/{song}.lab"
+
+phon_norm:
+  "SP": pau
+  "AP": pau
+  "j": y
+  "an": ae
+  "ik": ih
+exclude: []

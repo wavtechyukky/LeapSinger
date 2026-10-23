@@ -116,6 +116,14 @@ class HarmonicNoiseExcitationONNX(nn.Module):
         The trip count is unrolled, not dynamic, but `n_harm` is fixed at construction, so
         nothing about the input length is baked in.
 
+        The unrolled chain is not what ships, though: ONNX Runtime's default execution order
+        runs the n_harm blocks breadth-first (all sines first, then the adds), which keeps
+        ~n_harm sample-rate tensors alive — 0.28 MB per frame, 1.5 GB for a 30-second phrase —
+        and the 2560-node graph makes session creation slow. `export/harmonic_loop.py` therefore
+        folds the chain into a single ONNX `Loop` after export (same ops in the same order, so
+        the output is bit-identical; `Loop` exists since opset 1 and runs in every ORT, OpenUTAU's
+        included). Keep the Python loop below exactly as it is: that pass recognises this shape.
+
         Sequential accumulation does not reproduce `torch.sum`'s pairwise order bit for bit:
         measured -132 dB on the excitation waveform at n_harm=256 (-136 dB at 50), constant
         from 2.3 s to 23.2 s. That is float32 rounding, 36 dB below 16-bit quantization noise.

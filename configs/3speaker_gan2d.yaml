@@ -29,27 +29,62 @@ model:
   flow_loss: l2
   mel_vmin: -11.5
   mel_vmax: 2.0
+  pos_cond:               # frame-level relative positions added to the condition (leapsinger/modules/position.py).
+    phoneme: true         #   0 -> 1 inside each phoneme. On since 2026-10-17: the A/B showed no measurable gain
+                          #   or harm at 20k, kept as a cheap structural hint
+    encoding: sinusoidal  #   sinusoidal = DiffSinger's stretch embedding: round(1000*i/n) -> sinusoidal -> MLP.
+                          #   raised_cosine = the 8-bin circular code of the 2026-10-16 A/B (old checkpoints only)
+    unit: false           #   0 -> 1 inside a "nucleus unit" (raised_cosine only). Not used: it mirrors SynthV 2
+                          #   Pro's note-head -> note-head position
+    bins: 8               #   raised_cosine only
+    nucleus: [a, i, u, e, o, A, I, U, E, O, N]   # unit only
+  dur_cond: false         # log(1 + phoneme frames) embedding (DiffSinger's dur_embed). No measurable effect (2026-10-17)
+  # A/B from the command line without editing this file:
+  #   --set model.pos_cond.phoneme=false (no position)   /   --set model.dur_cond=true
+  # A resumed run keeps the position settings of its checkpoint, whatever this file says.
 excitation:
   n_harm: 256
-  noise_ratio: 0.05
+  noise_ratio: 0.05       # white noise in the excitation waveform (x the harmonic RMS)
   exc_scale: 0.15
-  harm_decay: 1.0
+  harm_decay: 1.5         # harmonic slope 1/k^decay (1.0 = -6 dB/oct). 1.5 since 2026-10-17: weaker high harmonics
+                          #   leave less harmonic residue in unvoiced consonants (the decay_15 A/B)
+  x0_sigma: 0.0           # Gaussian noise (std in the flow's [-1,1] mel units) added to the starting point x0.
+                          #   0 = the deterministic pseudo-mel (1 step + GAN). > 0 = a stochastic start for a
+                          #   multi-step teacher (reflow), with noise_ratio 0 so x0 depends only on this noise
 train:
   lr: 8.0e-4
   grad_clip: 1.0
   optimizer: radam
+  lr_decay: 0.8           # multiply the learning rate (and gan.d_lr, keeping their ratio) by this every
+  lr_decay_steps: 5000    #   lr_decay_steps, smoothly per step. 0.8 / 5000 = DiffSinger's StepLR pace (0.41x at
+                          #   20k, 0.21x at 35k, 0.11x at 50k). 1.0 = constant (the recipe before 2026-10-17)
+  amp: bf16               # fp32 | bf16. bf16 runs the encoder and the velocity network under autocast
+                          #   (faster on A100); the excitation STFT and the losses stay fp32
+  amp_fp32_io: true       # with bf16: keep the velocity network's input/output layers and its residual/skip
+                          #   sums in fp32 (only the 15 blocks' insides in bf16). false = all bf16
   max_updates: 50000      # 20k base + 30k GAN
-  max_batch_frames: 240000
-  max_batch_size: 128
+  max_batch_frames: 120000  # halved on 2026-10-17 (was 240000 / 128); eval loss was no worse (fast_v2)
+  max_batch_size: 64
+  min_batch_items: 16     # no tiny batches: pack longest-first and split the leftover with the previous batch.
+                          #   0 = old shortest-first packing, whose leftover (the 1–4 longest phrases) became a
+                          #   batch of its own every epoch and caused the collapse near 8k (2026-10-17)
   accum_steps: 2          # ignored by train.py (no accumulation); kept for compatibility
   recon_weight: 0.5
   flow_loss: l2
-  num_steps: 1
+  cons_weight: 1.0        # loss weight on consonant frames (phonemes the language pack dict/<lang>.yaml puts in
+                          #   neither vowels nor silence, cl included) and on the first cons_weight_next_ms of the
+                          #   phoneme after each. Applies to the flow loss and recon as a weighted mean (the overall
+                          #   scale stays); eval/loss and eval_gen stay unweighted. 1.0 = off
+  cons_weight_next_ms: 30 #   the consonant-to-vowel transition (30 ms = 5 frames at hop 256)
+  num_steps: 1            # inference (and TensorBoard / eval_ab) flow steps; a reflow teacher uses 8 or so
   save_interval: 1000
   log_interval: 50
-  eval_interval: 500
+  eval_interval: 2000
   eval_items: 3
-  vocoder: checkpoints/nhv_v3_2.onnx
+  eval_gen_metrics: true  # each eval: generate every eval phrase with num_steps and log tools/eval_ab.py's
+                          #   metrics to eval_gen/ (error dB, band texture ratio, unvoiced level bias/texture).
+                          #   Comparable across runs, unlike eval/loss (random t, inflated by x0 noise)
+  vocoder: checkpoints/nhv_v3_2_1.onnx   # TensorBoard の試聴用（hop 256）。I/O は v3.2 と同一
   num_workers: 4
   pitch_aug: false                    # true = formant-preserving pitch augmentation (needs recipe save_wav: true)
   pitch_aug_semitones: [-3.0, 3.0]    # random semitone range when augmenting (wider is OK: formants are preserved)
@@ -81,5 +116,13 @@ data:
     ritsu: 2
   eval_songs: 2           # songs held out per speaker for evaluation
   min_sec: 0.3
+  max_sec: 30             # drop phrases longer than this (8 phrases > 30 s in oniku/natsume/ritsu train).
+                          #   Excluded names are printed. null = keep all (the 2026-10-16 A/B)
   silence: true
   silence_fade_sec: 0.05
+  loudness_agc:           # slow AGC on the target mel (leapsinger/loudness.py); null = off.
+    sigma_sec: 1.0        #   removes loudness changes slower than ~1 s (phrase level, section level,
+    target_db: -30.0      #   crescendi) and keeps note-level and phonetic dynamics, so the model sings
+    k: 1.0                #   at a constant level whatever the score. target = frame loudness
+    max_gain_db: 12.0     #   20*log10(mean_bins exp(mel)) every phrase is brought to. Tune with
+    max_cut_db: 12.0      #   research/loudness_tuner before changing.

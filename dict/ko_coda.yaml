@@ -1,0 +1,13 @@
+# 言語パック: 韓国語（ko_coda.phonemes。Team CODA の表記）
+#
+# 書き方と使われ方は ja.yaml と同じ。子音 = vowels にも silence にも入らない音素すべて
+# （初声・わたり音 y w・終声・vf・cl）。
+
+phonemes: ko_coda.phonemes
+vowels: [a, eo, o, u, eu, i, e]
+silence: [pau, SP, AP]                   # SP・AP は前処理で pau に置き換わる
+
+# ── 評価用（tools/eval_ab.py）────────────────────────────────────────────────
+# 平音 g d b j は語頭では無声、母音の間では有声になるので、どちらにも入れない（「その他」。vf・cl も「その他」）
+voiceless: [k, t, p, ch, kk, tt, pp, ss, jj, s, h, K, T, P]     # 激音・濃音・s・h・閉じた終声
+voiced: [n, r, m, N, L, M, NG, y, w]                            # 鼻音・流音・わたり音

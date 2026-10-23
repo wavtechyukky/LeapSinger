@@ -1,0 +1,24 @@
+# Recipe: Alex Floarea 2.0（NeoDIVA の Alex_Floarea_EN_Public_Corpus、900 区間、1.14 h）。CC BY-NC 4.0。
+# 学習でできた埋め込みは公開してはいけない。旧版とは別の録音。ラベルは HTK（100 ns）で、198 本は末尾の SP が音声の終わりを超える。
+# nn = 音節を担う n（辞書の en へ）、fr/r = フライ（1 個）、ctrash = cl の書き間違い（1 個）。
+name: alex_2
+phonemes: dict/en_full.phonemes
+spk_id: 24                 # train.py の既定（config の data.spk_map が優先）
+style_id: 0
+lab_unit: "100ns"
+save_wav: false
+
+layout: type_split
+db_root: "/Volumes/ssd2t/singing_database/en/Alex_Floarea_EN_Public_Corpus"
+wav_dir: "wavs"
+wav: "wavs/{song}.wav"
+lab: "wavs/{song}.lab"
+
+phon_norm:
+  "SP": pau
+  "AP": pau
+  "vf": vf
+  "nn": en
+  "fr/r": vf
+  "ctrash": cl
+exclude: []

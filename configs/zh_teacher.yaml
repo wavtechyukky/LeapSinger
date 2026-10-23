@@ -1,0 +1,98 @@
+# Mandarin singing model (Opencpop) — the GAN-free reflow teacher (the recipe adopted for Japanese on 2026-10-18).
+# Phoneme list dict/zh_opencpop.phonemes (language pack dict/zh_opencpop.yaml): pinyin initials + finals, with the
+# apical i split into ir / i0. Opencpop is CC BY-NC-ND 4.0: non-commercial research only.
+#
+# 1. Convert the labels (once; writes per-segment labs under /Volumes/ssd2t/singing_database/_leapsinger_labels):
+#      python tools/convert_labels.py opencpop --src /Volumes/ssd2t/singing_database/segments/transcriptions.txt \
+#          --out /Volumes/ssd2t/singing_database/_leapsinger_labels/opencpop \
+#          --split train=/Volumes/ssd2t/singing_database/segments/train.txt \
+#                  test=/Volumes/ssd2t/singing_database/segments/test.txt --split_i
+# 2. Preprocess (locally; RMVPE on CPU, one recipe at a time): configs/recipes/opencpop_train.yaml and
+#    opencpop_test.yaml (-> data/opencpop_train, data/opencpop_test).
+# 3. Teacher, then the 1-step student:
+#      python -m train --config configs/zh_teacher.yaml --data_dirs <data>/opencpop_train <data>/opencpop_test \
+#          --run_name zh_teacher --out_root <log> --device cuda
+#      python -m train --config configs/zh_teacher.yaml --data_dirs (same) --run_name zh_student \
+#          --out_root <log> --device cuda --max_updates 20000 \
+#          --set train.reflow_teacher=<log>/zh_teacher/ckpt_035000.pt --set train.reflow_teacher_steps=16 \
+#          --set train.num_steps=1 --set train.lr=2.0e-4
+mel:
+  sr: 44100
+  hop: 256
+  n_fft: 2048
+  win: 2048
+  n_mels: 128
+  fmin: 40.0
+  fmax: 16000.0
+model:
+  hidden: 256
+  backbone_ch: 256
+  n_cycles: 3
+  dilation_schedule: pow2_15
+  encoder_type: attn
+  spk_dim: 32
+  n_speakers: 1
+  n_styles: 0
+  use_uv: false
+  flow_loss: l2
+  mel_vmin: -11.5
+  mel_vmax: 2.0
+  pos_cond:
+    phoneme: true
+    encoding: sinusoidal
+    unit: false
+    bins: 8
+                          # nucleus: not set -> the language pack's vowels (the finals)
+  dur_cond: false
+excitation:
+  n_harm: 256
+  noise_ratio: 0.05
+  exc_scale: 0.15
+  harm_decay: 1.5
+  x0_sigma: 0.0
+train:
+  lr: 8.0e-4
+  grad_clip: 1.0
+  optimizer: radam
+  lr_decay: 0.8
+  lr_decay_steps: 5000
+  amp: bf16
+  amp_fp32_io: true
+  max_updates: 35000      # 50000 for the final teacher
+  max_batch_frames: 120000
+  max_batch_size: 64
+  min_batch_items: 16
+  recon_weight: 0.5
+  flow_loss: l2
+  cons_weight: 1.0        # consonant loss weight (consonants = the initials). 1.0 = off
+  cons_weight_next_ms: 30
+  num_steps: 16
+  save_interval: 1000
+  log_interval: 50
+  eval_interval: 2000
+  eval_items: 3
+  eval_gen_metrics: true
+  vocoder: checkpoints/nhv_v3_2_1.onnx   # not yet checked on Mandarin: listen to the vocoded GT in TensorBoard first
+  num_workers: 4
+  pitch_aug: false
+  balance_speakers: true
+gan:
+  enabled: false
+data:
+  spk_map:
+    opencpop_train: 0
+    opencpop_test: 0
+  # Opencpop's official split: the test DB (5 songs, 206 segments) is the eval set. A segment counts as a "song"
+  # here, so eval_songs is set high: all test segments but one go to eval (the training DB keeps everything).
+  eval_dbs: [opencpop_test]
+  eval_songs: 9999
+  min_sec: 0.3
+  max_sec: 30
+  silence: true
+  silence_fade_sec: 0.05
+  loudness_agc:           # also evens out the per-segment loudness normalisation of the preprocessing
+    sigma_sec: 1.0
+    target_db: -30.0
+    k: 1.0
+    max_gain_db: 12.0
+    max_cut_db: 12.0

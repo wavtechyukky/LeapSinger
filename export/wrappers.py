@@ -25,6 +25,7 @@ import torch.nn as nn
 
 from leapsinger.models.acoustic_base import up2_linear
 from leapsinger.mel import SR, N_FFT, WIN_LEN, N_MELS, F_MIN, F_MAX
+from leapsinger.modules.position import frame_to_phoneme_onnx
 from .excitation_onnx import HarmonicNoiseExcitationONNX
 from .attention_onnx import patch_attention_for_export
 
@@ -76,6 +77,10 @@ class _ExportBase(nn.Module):
         orig_lr = m.length_regulator.forward
         m.length_regulator.forward = lambda x, d, ml=None: _lr_onnx(x, d)     # dynamic frames
         restore_attn = patch_attention_for_export(m)                         # dynamic token axis
+        pos = getattr(m, "pos_cond", None)
+        orig_f2p = pos.frame_to_phoneme if pos is not None else None
+        if pos is not None:
+            pos.frame_to_phoneme = frame_to_phoneme_onnx                     # searchsorted は export 不可
         style_id = (None if self.style_id is None
                     else torch.full((1,), self.style_id, dtype=torch.long, device=f0l256.device))
         try:
@@ -85,6 +90,8 @@ class _ExportBase(nn.Module):
         finally:
             m.length_regulator.forward = orig_lr
             restore_attn()
+            if pos is not None:
+                pos.frame_to_phoneme = orig_f2p
         if self.speaker == "embed":
             cond = cond + spk_embed.view(1, self.hidden, 1)                   # host-mixed spk vector
         elif self.speaker == "bake":

@@ -60,12 +60,32 @@ class DilatedConvDenoiser(nn.Module):
             GatedResBlock(ch, kernel=kernel, dilation=d, cond_dim=dim_cond, step_dim=step_dim)
             for d in dils)
         self.out = nn.Sequential(nn.Conv1d(ch, ch, 1), nn.SiLU(), nn.Conv1d(ch, mel_bins, 1))
+        # autocast（train.amp=bf16）のときに入出力と和を fp32 に残すか（config train.amp_fp32_io、train.py が
+        # 設定する）。重みではないので ckpt には入らない。autocast でなければ関係ない
+        self.fp32_io = True
 
     def forward(self, x, t, cond):
         se = self.step_emb(t)                      # [B, step_dim]
+        if self.fp32_io and torch.is_autocast_enabled(x.device.type):
+            return self._forward_mixed(x, se, cond)
         h = self.in_conv(x)
         skips = 0
         for blk in self.blocks:
             h, s = blk(h, cond=cond, step_emb=se)
             skips = skips + s
         return self.out(skips)                     # [B, mel_bins, T]
+
+    def _forward_mixed(self, x, se, cond):
+        """autocast（train.amp=bf16）の中で呼ばれたとき。入力の 1x1 conv・残差の流れ・skip の和・出力の層は
+        fp32 に残し、15 層の中身（dilated conv・ゲート・1x1 conv）だけ bf16 で回す。丸めが積み重なる所と、
+        出力（速度）そのものの精度を守る（実サイズ・乱数の重みで出力の相対誤差 0.74% → 0.44%）。
+        autocast でなければ通らないので、fp32 の学習・推論・ONNX 書き出しは変わらない。"""
+        dev = x.device.type
+        with torch.autocast(device_type=dev, enabled=False):
+            h = self.in_conv(x.float())
+        skips = 0
+        for blk in self.blocks:
+            h, s = blk(h, cond=cond, step_emb=se)  # h は fp32 のまま（bf16 の残差と足すと fp32 になる）
+            skips = skips + s.float()
+        with torch.autocast(device_type=dev, enabled=False):
+            return self.out(skips)

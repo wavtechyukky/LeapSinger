@@ -12,6 +12,7 @@ from leapsinger.modules.encoders.phoneme_encoder import PhonemeEncoder
 from leapsinger.modules.length_regulator import LengthRegulator
 from leapsinger.modules.flow.mel_dilated_rectified_flow import MelDilatedRectifiedFlow
 from leapsinger.modules.backbones.dilated_conv import DILATION_SCHEDULES
+from leapsinger.modules.position import PositionCondition
 
 
 class HarmonicAcousticBase(nn.Module):
@@ -31,6 +32,12 @@ class HarmonicAcousticBase(nn.Module):
                                        # (補間F0で倍音が全域に出る)。
         flow_loss: str = 'l1',         # 'l1'(既定) | 'l2'(openvpi 同等)。学習時のみ使用
         dilation_schedule: str = None, # backbone の dilation 列（DILATION_SCHEDULES のキー。None=n_cycles既定）
+        pos_cond: dict = None,         # {phoneme, unit, bins, encoding}。フレームの相対位置を cond に加算
+                                       # (leapsinger/modules/position.py)。None/全 False で無し。encoding が
+                                       # 無い dict（2026-10-16 の A/B の ckpt）は旧符号化 raised_cosine
+        dur_cond: bool = False,        # log(1+音素フレーム数) の埋め込みを cond に加算（DiffSinger の dur_embed）
+        nucleus_ids=None,              # pos_cond.unit の単位境界になる核音素（母音・N）の id 列
+        pau_id: int = 0,
     ):
         super().__init__()
         self.hidden = hidden
@@ -39,6 +46,14 @@ class HarmonicAcousticBase(nn.Module):
 
         self.phoneme_encoder = PhonemeEncoder(n_phonemes, hidden)
         self.length_regulator = LengthRegulator()
+        pc = dict(pos_cond or {})
+        self.pos_cond = None
+        if pc.get("phoneme") or pc.get("unit") or dur_cond:
+            self.pos_cond = PositionCondition(n_phonemes, hidden, nucleus_ids, pau_id=pau_id,
+                                              phoneme=bool(pc.get("phoneme", False)),
+                                              unit=bool(pc.get("unit", False)),
+                                              bins=int(pc.get("bins", 8)), dur=bool(dur_cond),
+                                              encoding=str(pc.get("encoding", "raised_cosine")))
         self.f0_emb = nn.Linear(1, hidden)
         self.uv_emb = nn.Embedding(2, hidden) if use_uv else None   # uvフリー時は持たない
         self.spk_emb = None
@@ -69,6 +84,8 @@ class HarmonicAcousticBase(nn.Module):
     ):
         ph_feat = self.phoneme_encoder(phoneme_ids, padding_mask)     # [B, Tp, H]
         c = self.length_regulator(ph_feat, ph_durations, max_frames)  # [B, T, H]
+        if self.pos_cond is not None:                                 # 音素内/単位内の相対位置 (+ log 長)
+            c = c + self.pos_cond(phoneme_ids, ph_durations, c.shape[1])
         c = c + self.f0_emb(f0_logf0.unsqueeze(-1))
         if self.use_uv:                            # uvフリー時は v/uv を条件に入れない
             c = c + self.uv_emb((uv > 0.5).long())

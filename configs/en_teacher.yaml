@@ -1,0 +1,142 @@
+# English singing model — the GAN-free reflow teacher (the recipe adopted for Japanese on 2026-10-18), on the
+# English datasets on hand. Phoneme list dict/en_full.phonemes (language pack dict/en_full.yaml).
+# Non-commercial research only: several datasets forbid publishing a model of their voice without permission
+# (research/doc/leapsinger_multilang_datasets_2026-10-18.md).
+# NUS-48E is not used (2026-10-19: too weak as teacher data).
+# Result (2026-10-19, run en_teacher, 50k): poor; even the vocoded ground truth has dropouts and echo. English is
+# parked; this config is kept as is.
+#
+# 1. Preprocess (locally, where the data is; RMVPE on CPU, one recipe at a time — never in parallel). NGYY needs its
+#    labels converted first (see configs/recipes/ngyy_*.yaml):
+#      python -m preprocess.run --recipe configs/recipes/<db>.yaml --check     # labels only
+#      python -m preprocess.run --recipe configs/recipes/<db>.yaml             # -> data/<db>/
+#    <db>: aidol, alex_ai_svs, alex_2, kumi, ngyy_{lan,shuang,xue},
+#          trei_{solid_sets,solid_songs,sweet,emote,power,masc,husky,whisper}   (about 8.9 h of phrases, pauses
+#          included)
+#    optional: trei_solid_extra (fry / crack drills), trei_grit (growl), trei_rap. Not used: trei_screamo_* (F0 is
+#    unreliable there).
+#    The shards (shard.npz + metadata.json) are kept in research/leapsinger_data/<db>/.
+# 2. Teacher (16-step flow, no GAN), then the 1-step student from its pairs:
+#      python -m train --config configs/en_teacher.yaml --data_dirs <data>/<db> ... --run_name en_teacher \
+#          --out_root <log> --device cuda
+#      python -m train --config configs/en_teacher.yaml --data_dirs (same) --run_name en_student \
+#          --out_root <log> --device cuda --max_updates 20000 \
+#          --set train.reflow_teacher=<log>/en_teacher/ckpt_050000.pt --set train.reflow_teacher_steps=16 \
+#          --set train.num_steps=1 --set train.lr=2.0e-4
+mel:
+  sr: 44100
+  hop: 256
+  n_fft: 2048
+  win: 2048
+  n_mels: 128
+  fmin: 40.0
+  fmax: 16000.0
+model:
+  hidden: 256
+  backbone_ch: 256
+  n_cycles: 3
+  dilation_schedule: pow2_15
+  encoder_type: attn
+  spk_dim: 32
+  n_speakers: 8           # = data.spk_map (ids 0–7)
+  n_styles: 11            # = data.style_map (ids 0–10, some unused unless the optional DBs are trained). Only TREI has
+                          #   styles; every other voice sings in style 0. The ONNX export (export/cli.py) has no style
+                          #   input yet: add one before the SVS can blend these styles
+  use_uv: false
+  flow_loss: l2
+  mel_vmin: -11.5
+  mel_vmax: 2.0
+  pos_cond:               # frame-level relative position inside each phoneme (leapsinger/modules/position.py)
+    phoneme: true
+    encoding: sinusoidal  # DiffSinger's stretch embedding
+    unit: false
+    bins: 8
+                          # nucleus: not set -> the language pack's vowels (dict/en_full.yaml)
+  dur_cond: false
+excitation:
+  n_harm: 256
+  noise_ratio: 0.05       # white noise in the excitation waveform: the only randomness of the start
+  exc_scale: 0.15
+  harm_decay: 1.5
+  x0_sigma: 0.0           # no log-mel noise (it left the harmonic peaks jagged)
+train:
+  lr: 8.0e-4
+  grad_clip: 1.0
+  optimizer: radam
+  lr_decay: 0.8
+  lr_decay_steps: 5000
+  amp: bf16
+  amp_fp32_io: true
+  max_updates: 50000      # the length of the adopted Japanese teacher (teacher_n005_s0, 35k -> 50k)
+  max_batch_frames: 120000
+  max_batch_size: 64
+  min_batch_items: 16
+  recon_weight: 0.5
+  flow_loss: l2
+  cons_weight: 1.0        # consonant loss weight (dict/en_full.yaml: consonants = neither vowels nor silence). 1.0 = off
+  cons_weight_next_ms: 30
+  num_steps: 16           # the teacher is solved in 16 steps (TensorBoard, eval_gen, reflow pairs)
+  save_interval: 1000
+  log_interval: 50
+  eval_interval: 2000
+  eval_items: 3
+  eval_gen_metrics: true
+  vocoder: checkpoints/nhv_v3_2_1.onnx   # listening in TensorBoard. NHVSing v3.2.1 was trained on Japanese voices
+                                         #   and is not yet checked on English ones: listen to the vocoded GT
+                                         #   (spk*/s*_gt) first
+  num_workers: 4
+  pitch_aug: false
+  balance_speakers: false # sample in proportion to the amount of data (the first English run). true = every voice
+                          #   (spk_map id) equally
+gan:
+  enabled: false          # GAN-free: multi-step teacher -> 1-step reflow student
+data:
+  spk_map:                # data folder (= recipe name) -> speaker id
+    aidol: 0
+    alex_ai_svs: 1        # Alex Floarea: the legacy set and 2.0 are different recordings -> separate ids
+    alex_2: 2
+    kumi: 3
+    ngyy_lan: 4           # NGYY: one singer, three voice colours -> separate ids
+    ngyy_shuang: 5
+    ngyy_xue: 6
+    trei_solid_sets: 7    # TREI: one singer, so one speaker id; the singing styles are in style_map
+    trei_solid_songs: 7
+    trei_solid_extra: 7
+    trei_sweet: 7
+    trei_emote: 7
+    trei_power: 7
+    trei_grit: 7
+    trei_masc: 7
+    trei_rap: 7
+    trei_husky: 7
+    trei_whisper: 7
+    trei_screamo_songs: 7
+    trei_screamo_sets: 7
+  style_map:              # data folder -> style id (a folder not listed here sings in style 0)
+    trei_solid_sets: 0    # SOLID = TREI's plain voice, the same style 0 as every other voice
+    trei_solid_songs: 0
+    trei_sweet: 1
+    trei_emote: 2
+    trei_power: 3
+    trei_masc: 4
+    trei_husky: 5
+    trei_whisper: 6
+    trei_solid_extra: 7   # optional (fry / crack drills)
+    trei_grit: 8          # optional (growl)
+    trei_rap: 9           # optional
+    trei_screamo_songs: 10  # not used
+    trei_screamo_sets: 10
+  # Hold out whole songs, only from DBs that come as whole songs. NGYY and Alex 2.0 are cut into segments (a "song"
+  # there is one segment).
+  eval_dbs: [aidol, trei_solid_songs, alex_ai_svs, kumi]
+  eval_songs: 2
+  min_sec: 0.3
+  max_sec: 30
+  silence: true
+  silence_fade_sec: 0.05
+  loudness_agc:
+    sigma_sec: 1.0
+    target_db: -30.0
+    k: 1.0
+    max_gain_db: 12.0
+    max_cut_db: 12.0

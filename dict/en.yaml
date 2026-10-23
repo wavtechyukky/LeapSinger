@@ -1,0 +1,13 @@
+# 言語パック: 英語（ARPAbet 小文字・ストレス数字なし。音素の一覧は en.phonemes）
+#
+# 書き方と使われ方は ja.yaml と同じ。子音 = vowels にも silence にも入らない音素すべて（cl も子音）。
+
+phonemes: en.phonemes
+vowels: [aa, ae, ah, ao, aw, ay, eh, er, ey, ih, iy, ow, oy, uh, uw, ax]   # er = R 音性の母音、ax = シュワー
+silence: [pau, sil, sp, br]              # sil・sp・br は前処理で pau に置き換わる
+
+# ── 評価用（tools/eval_ab.py）────────────────────────────────────────────────
+# 英語には無声化した母音の区別が無い。cl（破裂の前の閉鎖）は「その他」
+voiceless: [p, t, k, ch, f, th, s, sh, hh, q, tr]      # q = 声門閉鎖、tr = /tr/ の破擦音
+voiced: [b, d, g, jh, v, dh, z, zh, m, n, ng, l, r, w, y, dx, dr]   # dx = 弾き音、dr = /dr/ の破擦音
+steady_vowels: [aa, ae, ah, ao, eh, er, ih, iy, uh, uw, ax]   # 二重母音（aw ay ey ow oy）は動くので外す

@@ -91,15 +91,17 @@ Python 3.10 以上。リポジトリを clone して editable install します�
 
 学習や書き出しの設定は yaml で行います（`configs/` に例があります）。yaml は `mel` / `model` / `excitation` / `train` / `gan` / `data` の6つのセクションに分かれています。主な項目は次のとおりです。
 
-- `model` — `spk_dim`（0より大きいと多話者）、`n_speakers`、`n_styles`（0より大きいとスタイル機能を使う）、`use_uv`（v/uvを条件に使うか）
-- `excitation` — `n_harm`（倍音の本数）、`harm_decay`（倍音の減衰）、`noise_ratio`（ホワイトノイズの強さ）
-- `train` — `lr`、`max_updates`、`num_steps`（推論のステップ数。**1** を推奨）、`balance_speakers`（話者を均等にサンプリング）など
+- `model` — `spk_dim`（0より大きいと多話者）、`n_speakers`、`n_styles`（0より大きいとスタイル機能を使う）、`use_uv`（v/uvを条件に使うか）、`pos_cond`（音素内の相対位置を条件に加算。`phoneme` で on/off（既定 on）、`encoding: sinusoidal` は DiffSinger の stretch 埋め込みと同じ形（round(1000·i/n) → 正弦波の埋め込み → MLP）、`raised_cosine` は 2026-10-16 の A/B で使った旧符号化（古い ckpt を読むためだけ。`unit` = 核音素単位内の位置もこちら専用で、使わない）。途中から再開する学習は ckpt の設定のまま続く）、`dur_cond`（log(1+音素フレーム数) の埋め込み。既定 off）。`--set model.pos_cond.phoneme=false` のように config を書き換えずに A/B できます
+- `excitation` — `n_harm`（倍音の本数）、`harm_decay`（倍音の減衰。既定 1.5）、`noise_ratio`（ホワイトノイズの強さ）、`x0_sigma`（flow の出発点に足すガウスノイズの標準偏差。0 より大きいと確率的な出発点になり、複数 step で解く reflow の教師になる。既定 0）
+- `train` — `lr`、`max_updates`、`num_steps`（推論のステップ数。**1** を推奨）、`balance_speakers`（話者を均等にサンプリング）、`min_batch_items`（0 より大きいと長い順に詰め、最後の余りを直前のバッチと半分ずつに分け直して、最長の数本だけの極小バッチを作らない）など。学習中はクリップ前の勾配ノルム（区間内の最大・中央値）、最小バッチ本数、区間内の最大損失を TensorBoard に記録し、勾配ノルムが直近の中央値の 5 倍を超えた step はバッチの中身ごと `<run>/spikes.log` に残します。`amp`（`fp32` | `bf16`。`bf16` はエンコーダと速度場ネットを autocast で回す。A100 などで速くなる）。`lr_decay` / `lr_decay_steps`（1 未満なら、学習率と判別器の学習率を lr_decay_steps ごとに lr_decay 倍のペースで毎 step なめらかに下げる。0.8 / 5000 は DiffSinger と同じペース。既定 1.0 = 一定）。チェックポイントには学習の設定（バッチ・学習率・精度など）も記録し、途中から再開したときに設定が違えば表示します。1 step の時間の内訳も記録します: `time/data_wait_ms`（データ待ち）、`time/h2d_ms`（GPU への転送）、`time/step_ms`（計算）、`time/steps_per_sec`、`time/eval_s`・`time/save_s`、計算の中の GPU 時間 `time/gpu_{aug,enc,exc,net,gan,bwd,opt}_ms`（`exc` が擬似 mel の作成、`net` が速度場ネットと損失）
 - `gan` — 質感を鮮明化する GAN の設定。`enabled`（`false` で flow損失＋mel損失のみの学習）、`gan_start_step`（GAN を入れ始める step）、`gan_strength`（敵対的損失の強さ）など
-- `data` — `spk_map` / `style_map`（データセットのフォルダ名 → 話者ID / スタイルID の対応）
+- `data` — `spk_map` / `style_map`（データセットのフォルダ名 → 話者ID / スタイルID の対応）、`max_sec`（これより長いフレーズを除外。除外したフレーズ名は起動時に表示）、`loudness_agc`（学習目標 mel の遅い自動ゲイン。`sigma_sec` より遅い音量変化＝フレーズ間のレベル差や区間のクレッシェンドを取り除き、ノート単位・音素由来の起伏は残す。モデルが巨視的な音量を学ばなくなるので、どんな譜面でも一定レベルで歌う。`null` で無効）
 
 ### 辞書の作成
 
 日本語の音素の一覧は `dict/ja.phonemes` にあります（1行に1音素、並び順がそのままID、先頭の `pau` が ID 0、`#` から先はコメント）。日本語以外や独自の音素を使いたいときは、同じ形式のファイルを用意し、各コマンドに `--phonemes <ファイル>` で渡します（省略時は日本語の `dict/ja.phonemes` を使います）。
+
+音素の一覧だけでは表せない音素の種類は、言語パック `dict/<言語>.yaml` に書きます（例: `dict/ja.yaml`・`dict/en.yaml`）。`phonemes` で音素の一覧を参照し、`vowels`（母音）と `silence`（静音）を決めます。どちらにも入らない音素はすべて子音です。評価ツール用に、`devoiced`（無声化した母音）・`voiceless`（無声子音）・`voiced`（有声子音）・`steady_vowels`（長い母音の揺れを見る母音）も書けます（無くても動きます）。学習と評価は、モデルやデータの音素の一覧と中身が同じ言語パックを `dict/` から探して使います。子音の損失の重み（`train.cons_weight`）には言語パックが要ります。
 
 ### preprocess
 
@@ -114,6 +116,11 @@ Python 3.10 以上。リポジトリを clone して editable install します�
     python preprocess/download_scripts/download_ritsu.py
 
 F0の抽出にはRMVPEを使います（RMVPEはマルチプロセスで動かさないようご注意ください）。
+
+- レシピに `phonemes: dict/<一覧>.phonemes` を書くと、そのデータの音素の一覧になります（`--phonemes` が優先）。
+- `--check` を付けると、音声は処理せずにラベルだけを確かめます。見るのは、音素の一覧に無い記号（`phon_norm` と無音の写像の後）、wav やラベルの欠け、ラベルが音声の終わりを超える長さです。何も書きません。
+- `layout: from_lab` は、ラベルのファイルがある曲だけを読みます（`lab` のテンプレートは絶対パスでもよい）。
+- 音素の長さしか持たないラベル（Opencpop の `transcriptions.txt`、DiffSinger の `transcriptions.csv`）は、`tools/convert_labels.py` で区間ごとの lab に変換してから読みます。
 
 ### training
 
@@ -149,6 +156,8 @@ F0の抽出にはRMVPEを使います（RMVPEはマルチプロセスで動か�
 - **なし（none）** — 単一話者モデル向けです。話者の入力も焼き込みもしません（話者の概念がないグラフ）。多話者モデルではbakeかembedを使います。
 
 スタイル付きのモデル（`n_styles` > 0）は `--variant full` で書き出し、使うスタイルを `--style-id`（既定 0）でグラフに焼き込みます。スタイルごとに別のONNXになります。
+
+書き出しの最後に、励起の倍音の足し合わせ（既定 256 本ぶんの直線の列）を 1 つの ONNX `Loop` に畳みます（`export/harmonic_loop.py`。`--no-harmonic-loop` で展開したままにできます）。展開したままだと onnxruntime の既定の実行順で 256 本のサンプル長の配列が同時に生き、ピークメモリが 0.28 MB/フレーム（30 秒の句で約 1.5 GB）に達するためです。Loop 化で 30 秒の句のピークは +1469 MB → +287 MB、実行も 1〜3 割速く、セッション作成は 10 倍速くなります。式と計算の順番は同じなので出力はビット単位で同じです（`--verify` で展開形と比べて確かめます）。`Loop` は opset 1 からある演算子で、OpenUTAU の onnxruntime を含めどの実行環境でも動きます。書き出し済みの ONNX にも単体で掛けられます: `python -m export.harmonic_loop <in.onnx> <out.onnx> --check`
 
 ### ボコーダー
 

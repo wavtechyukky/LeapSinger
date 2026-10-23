@@ -1,0 +1,72 @@
+# 音素インベントリ: 英語（手持ちの英語の歌声データセット 7 つを全部読める版）
+#
+# id = 行順、id 0 は pau（pad / 無音）。
+# 先頭の 46 行は en.phonemes と同じ並び（id も同じ）。en.phonemes は PrettyPitch の音素表と同じ中身に
+# 保つ約束があるので変えず、データセットに出てくる音をこのファイルの末尾に足した。
+# 行を挿入・並べ替えしないこと（id が動くと既存 ckpt の埋め込み行とずれる）。足すときは末尾へ。
+#
+# 対象: NUS-48E、Project AIdol、TREI CORPUS 1.0、Alex Floarea AI-SVS（旧版）、Alex Floarea 2.0、Kumi、NGYY。
+# 無音・息（SP AP sil sp exh EP など）と書き間違いは、各レシピの phon_norm で写す（configs/recipes/）。
+
+pau                 # 0: silence / pad
+
+# 母音
+aa
+ae
+ah                  # /ʌ/（but）。CMUdict 系のラベル（NUS）ではシュワーもここに入る
+ao
+aw
+ay
+eh
+er
+ey
+ih
+iy
+ow
+oy
+uh
+uw
+
+# 子音
+b
+ch
+d
+dh
+f
+g
+hh
+jh
+k
+l
+m
+n
+ng
+p
+r
+s
+sh
+t
+th
+v
+w
+y
+z
+zh
+
+# en.phonemes の拡張記号
+ax                  # /ə/ シュワー
+dx                  # 弾き音（butter の tt）
+q                   # 声門閉鎖（AIdol の GS もここへ）
+dr                  # /dr/
+tr                  # /tr/
+cl                  # 破裂の前の閉鎖
+
+# ── ここから en_full だけの記号（2026-10-18）──────────────────────────────
+oh                  # /ɒ/ イギリス英語の LOT 母音（got, stop）。Alex Floarea 旧版
+el                  # 音節を担う l（battle）。Kumi
+en                  # 音節を担う n。AIdol（Alex Floarea 2.0 の nn もここへ）
+rr                  # 巻き舌・唸りの r。TREI
+qh                  # メリスマの中の声門の再アタック（ih qh ih）。TREI
+vf                  # ボーカルフライ（エッジボイス。日本語の Edge にあたる）。AIdol・TREI・Alex Floarea
+vk                  # 声の裏返り（クラック）。TREI
+vg                  # 立ち上がりの唸り。TREI（1 回だけ）

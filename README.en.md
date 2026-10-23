@@ -91,15 +91,17 @@ Python 3.10 or later. Clone the repository and do an editable install.
 
 Training and export are driven by YAML (there are examples in `configs/`). A YAML file has six sections: `mel` / `model` / `excitation` / `train` / `gan` / `data`. The main keys are:
 
-- `model` — `spk_dim` (greater than 0 means multi-speaker), `n_speakers`, `n_styles` (greater than 0 enables styles), `use_uv` (whether to feed v/uv as a condition).
-- `excitation` — `n_harm` (number of harmonics), `harm_decay` (harmonic decay), `noise_ratio` (white-noise strength).
-- `train` — `lr`, `max_updates`, `num_steps` (inference steps; **1** recommended), `balance_speakers` (sample speakers equally), and so on.
+- `model` — `spk_dim` (greater than 0 means multi-speaker), `n_speakers`, `n_styles` (greater than 0 enables styles), `use_uv` (whether to feed v/uv as a condition), `pos_cond` (the relative position inside each phoneme, added to the condition: `phoneme` switches it, on by default; `encoding: sinusoidal` is DiffSinger's stretch embedding, round(1000·i/n) → sinusoidal embedding → MLP; `raised_cosine` is the old code of the 2026-10-16 A/B, kept only to load old checkpoints, and `unit`, the position inside each nucleus unit, works only with it and is not used; a resumed run keeps its checkpoint's setting), `dur_cond` (log(1 + phoneme frames) embedding; off by default). `--set model.pos_cond.phoneme=false` overrides the config for A/B runs without editing it.
+- `excitation` — `n_harm` (number of harmonics), `harm_decay` (harmonic decay, 1.5 by default), `noise_ratio` (white-noise strength), `x0_sigma` (standard deviation of Gaussian noise added to the flow's starting point; above 0 the start becomes stochastic and the model becomes a multi-step reflow teacher; 0 by default).
+- `train` — `lr`, `max_updates`, `num_steps` (inference steps; **1** recommended), `balance_speakers` (sample speakers equally), `min_batch_items` (above 0: pack longest-first and split the final leftover with the previous batch, so the few longest phrases never form a tiny batch of their own), and so on. Training logs the pre-clip gradient norm (max and median per interval), the smallest batch and the largest loss per interval to TensorBoard, and writes every step whose gradient norm exceeds 5× the recent median, with the batch's contents, to `<run>/spikes.log`. `amp` (`fp32` | `bf16`; `bf16` runs the encoder and the velocity network under autocast, faster on an A100). `lr_decay` / `lr_decay_steps` (below 1, the learning rate and the discriminator's learning rate fall smoothly every step, by a factor of lr_decay every lr_decay_steps; 0.8 / 5000 is DiffSinger's pace; the default 1.0 keeps it constant). Checkpoints also record the training settings (batch, learning rate, precision and so on), and a resumed run reports any setting that differs. Each step's time is broken down as well: `time/data_wait_ms` (waiting for data), `time/h2d_ms` (copy to the GPU), `time/step_ms` (compute), `time/steps_per_sec`, `time/eval_s` and `time/save_s`, and the GPU time inside the compute, `time/gpu_{aug,enc,exc,net,gan,bwd,opt}_ms` (`exc` is the pseudo-mel, `net` the velocity network and the losses).
 - `gan` — settings for the GAN that sharpens texture. `enabled` (`false` = flow loss + mel loss only), `gan_start_step` (the step at which the GAN turns on), `gan_strength` (strength of the adversarial loss), and so on.
-- `data` — `spk_map` / `style_map` (mapping from dataset folder name → speaker ID / style ID).
+- `data` — `spk_map` / `style_map` (mapping from dataset folder name → speaker ID / style ID), `max_sec` (drop phrases longer than this; the dropped names are printed at start-up), `loudness_agc` (slow automatic gain on the target mel: loudness changes slower than `sigma_sec` — phrase-to-phrase level, section-level crescendi — are removed, note-level and phonetic dynamics are kept, so the model sings at a constant level whatever the score; `null` turns it off).
 
 ### Building a dictionary
 
 The Japanese phoneme list is in `dict/ja.phonemes` (one phoneme per line, the order is the ID, `pau` at the top is ID 0, and anything after `#` is a comment). To use a different language or your own phonemes, make a file in the same format and pass it to each command with `--phonemes <file>` (if omitted, the Japanese `dict/ja.phonemes` is used).
+
+Phoneme classes that the list cannot express go in a language pack, `dict/<language>.yaml` (for example `dict/ja.yaml` and `dict/en.yaml`). It points to the phoneme list with `phonemes` and defines `vowels` and `silence`; every other phoneme is a consonant. For the evaluation tool it can also list `devoiced` (devoiced vowels), `voiceless` and `voiced` consonants, and `steady_vowels` (vowels whose long middles are checked for wobble); these are optional. Training and evaluation look in `dict/` for the language pack whose phoneme list matches the model's or the data's. The consonant loss weight (`train.cons_weight`) needs a language pack.
 
 ### Preprocessing
 
@@ -114,6 +116,11 @@ The three databases used in the examples can be downloaded with these scripts (p
     python preprocess/download_scripts/download_ritsu.py
 
 F0 is extracted with RMVPE. (Please do not run RMVPE across multiple processes.)
+
+- A recipe can name its phoneme list with `phonemes: dict/<list>.phonemes` (`--phonemes` takes precedence).
+- `--check` only checks the labels, without processing audio. It reports symbols missing from the phoneme list (after `phon_norm` and the silence map), missing wav or label files, and labels that run past the end of the audio. It writes nothing.
+- `layout: from_lab` reads only the songs that have a label file (the `lab` template may be an absolute path).
+- Labels that only hold phoneme durations (Opencpop's `transcriptions.txt`, DiffSinger's `transcriptions.csv`) are converted to per-segment labs with `tools/convert_labels.py` first.
 
 ### Training
 
@@ -149,6 +156,8 @@ The notebook exports the acoustic model to a single ONNX and runs it end to end 
 - **none** — for single-speaker models. No speaker input and no baking (a graph with no notion of speaker). For multi-speaker models, use bake or embed.
 
 A style-bearing model (`n_styles` > 0) is exported with `--variant full`, and the style to use is baked into the graph with `--style-id` (default 0) — one ONNX per style.
+
+As the last post-export pass, the excitation's harmonic sum (a straight-line chain of 256 blocks by default) is folded into a single ONNX `Loop` (`export/harmonic_loop.py`; `--no-harmonic-loop` keeps the unrolled chain). Left unrolled, onnxruntime's default execution order keeps 256 sample-rate arrays alive at once and peak memory reaches 0.28 MB per frame (about 1.5 GB for a 30-second phrase). With the Loop, the 30-second peak drops from +1469 MB to +287 MB, inference is 10–30% faster and session creation is 10× faster. The formula and the order of operations are unchanged, so the output is bit-identical (`--verify` compares against the unrolled form). `Loop` has existed since opset 1 and runs on every runtime, including OpenUTAU's onnxruntime. It can also be applied to an already exported ONNX: `python -m export.harmonic_loop <in.onnx> <out.onnx> --check`
 
 ### Vocoder
 

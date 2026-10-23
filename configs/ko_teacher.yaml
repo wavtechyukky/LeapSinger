@@ -1,0 +1,107 @@
+# Korean singing model, two speakers — the GAN-free reflow teacher (the recipe adopted for Japanese), on
+# Sds-Korean-Singing-Dataset: Mechol-001 (a teenage man, 31.5 min) and SODAsoo-001 (an adult woman, 6 labelled
+# songs, 10.1 min). Both are SODAsoo's datasets. ~0.69 h in all: a test of how far this little data goes.
+# Phoneme list dict/ko_coda.phonemes (language pack dict/ko_coda.yaml): Team CODA's romanisation.
+# Research only: the upstream terms (2026-10-18) require asking before distributing a model with the data's
+# characteristics, and forbid commercial use.
+#
+# 0. The labels and audio were tidied into /Volumes/ssd2t/singing_database/_leapsinger_labels/sds_{mechol001,sodasoo001}
+#    by tools/convert_labels.py lab (Mechol cut into 29 pieces of ~1 min at pauses; SODAsoo's caffeinism gaps filled
+#    with --fill_gaps). See the recipes.
+# 1. Preprocess (locally; RMVPE on CPU, one recipe at a time — never in parallel):
+#      python -m preprocess.run --recipe configs/recipes/sds_mechol001.yaml     # -> data/sds_mechol001
+#      python -m preprocess.run --recipe configs/recipes/sds_sodasoo001.yaml    # -> data/sds_sodasoo001
+#    The shards (shard.npz + metadata.json) are kept in research/leapsinger_data/<db>/.
+# 2. Teacher (16-step flow, no GAN), then the 1-step student from its pairs:
+#      python -m train --config configs/ko_teacher.yaml --data_dirs <data>/sds_mechol001 <data>/sds_sodasoo001 \
+#          --run_name ko_teacher --out_root <log> --device cuda
+#      python -m train --config configs/ko_teacher.yaml --data_dirs (same) --run_name ko_student \
+#          --out_root <log> --device cuda --max_updates 20000 \
+#          --set train.reflow_teacher=<log>/ko_teacher/ckpt_<best>.pt --set train.reflow_teacher_steps=16 \
+#          --set train.num_steps=1 --set train.lr=2.0e-4
+#    With this little data the teacher may overfit well before 50k: pick the checkpoint by the eval loss and by ear.
+#
+# Result (2026-10-20, run ko_teacher): the eval loss is lowest at 6k (0.0229) and rises steadily to 50k (0.0322);
+# the generated-mel error is lowest at 12k–18k (5.90 dB). By ear the man (Mechol) is passable and the woman
+# (SODAsoo, ~9 min of training data) is poor — most likely the amount of data, not the labels. Not published:
+# the Korean model waits until SODAsoo's labelling of the remaining songs is finished; only this config is kept.
+mel:
+  sr: 44100
+  hop: 256
+  n_fft: 2048
+  win: 2048
+  n_mels: 128
+  fmin: 40.0
+  fmax: 16000.0
+model:
+  hidden: 256
+  backbone_ch: 256
+  n_cycles: 3
+  dilation_schedule: pow2_15
+  encoder_type: attn
+  spk_dim: 32
+  n_speakers: 2
+  n_styles: 0
+  use_uv: false
+  flow_loss: l2
+  mel_vmin: -11.5
+  mel_vmax: 2.0
+  pos_cond:
+    phoneme: true
+    encoding: sinusoidal
+    unit: false
+    bins: 8
+                          # nucleus: not set -> the language pack's vowels
+  dur_cond: false
+excitation:
+  n_harm: 256
+  noise_ratio: 0.05
+  exc_scale: 0.15
+  harm_decay: 1.5
+  x0_sigma: 0.0
+train:
+  lr: 8.0e-4
+  grad_clip: 1.0
+  optimizer: radam
+  lr_decay: 0.8
+  lr_decay_steps: 5000
+  amp: bf16
+  amp_fp32_io: true
+  max_updates: 50000      # the length of the adopted Japanese teacher; checkpoints every 1000 to pick from
+  max_batch_frames: 120000
+  max_batch_size: 64
+  min_batch_items: 16
+  recon_weight: 0.5
+  flow_loss: l2
+  cons_weight: 1.0
+  cons_weight_next_ms: 30
+  num_steps: 16
+  save_interval: 1000
+  log_interval: 50
+  eval_interval: 2000
+  eval_items: 3
+  eval_gen_metrics: true
+  vocoder: checkpoints/nhv_v3_2_1.onnx   # trained on Japanese voices: listen to the vocoded GT (spk*/s*_gt) first
+  num_workers: 4
+  pitch_aug: false
+  balance_speakers: true  # both voices equally often (SODAsoo has ~1/4 of the data; it is repeated more)
+gan:
+  enabled: false
+data:
+  spk_map:
+    sds_mechol001: 0      # man
+    sds_sodasoo001: 1     # woman
+  # One "song" per voice is held out (seed 42): Mechol's piece mechol_natural_s020 (~1 min) and SODAsoo's
+  # modugananeul (79 s, 13 % of her data).
+  eval_dbs: [sds_mechol001, sds_sodasoo001]
+  eval_songs: 1
+  min_sec: 0.3
+  max_sec: 30
+  silence: true
+  silence_fade_sec: 0.05
+  loudness_agc:
+    sigma_sec: 1.0
+    target_db: -30.0
+    k: 1.0
+    max_gain_db: 12.0
+    max_cut_db: 12.0

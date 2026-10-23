@@ -119,12 +119,22 @@ def g_adv_fm_jcu(disc, x_t, real_n, fake_n, t, cond_id=None):
 # ── 監視指標: mel 鮮明度 Var_L（Revisiting Over-Smoothness, Ren+ 2022） ────────────
 
 @torch.no_grad()
-def laplacian_var_ratio(pred_mel, gt_mel) -> float:
+def laplacian_var_ratio(pred_mel, gt_mel, valid=None) -> float:
     """Laplacian 応答の分散（=時間/周波数エッジ量）の pred/GT 比。
     1.0 に近いほど GT 並みの鮮明さ。回帰系学習は潰れて 1.0 を下回る。
-    入力: [B, mel, T]（ln-mel 域。同一スケールで比を取るので域はどちらでも可）。"""
+    入力: [B, mel, T]（ln-mel 域。同一スケールで比を取るので域はどちらでも可）。
+    valid: [B, T] bool（True=有効フレーム）。学習バッチではパディング（損失をマスクしていて出力が
+    何でもよいフレーム）を除くために渡す。3x3 の窓が全部有効なフレームだけで分散を取る。"""
     k = torch.tensor([[0., 1., 0.], [1., -4., 1.], [0., 1., 0.]],
                      device=pred_mel.device, dtype=torch.float32).view(1, 1, 3, 3)
-    def _v(m):
-        return F.conv2d(m.unsqueeze(1).float(), k).abs().var()
-    return float(_v(pred_mel) / _v(gt_mel).clamp_min(1e-8))
+    def _r(m):
+        return F.conv2d(m.unsqueeze(1).float(), k).abs()          # [B,1,mel-2,T-2]
+    rp, rg = _r(pred_mel), _r(gt_mel)
+    if valid is None:
+        return float(rp.var() / rg.var().clamp_min(1e-8))
+    v = valid.bool()
+    v = v[:, 1:-1] & v[:, :-2] & v[:, 2:]                         # [B, T-2]
+    m = v[:, None, None, :].expand_as(rp)
+    if not bool(m.any()):
+        return float("nan")
+    return float(rp[m].var() / rg[m].var().clamp_min(1e-8))

@@ -1,0 +1,21 @@
+# Recipe: NGYY（南宫颜·羽）の英語、声色 Lan。他人やほかのキャラクターの名前で公開しないこと。
+# ラベルは DiffSinger の transcriptions.csv だけなので、tools/convert_labels.py csv で lab に変換したものを読む:
+#   python tools/convert_labels.py csv --src "/Volumes/ssd2t/singing_database/en/NGYY_ENG_Dataset/NGYY_ENG_Lan/transcriptions.csv" \
+#       --out /Volumes/ssd2t/singing_database/_leapsinger_labels/ngyy/NGYY_ENG_Lan
+name: ngyy_lan
+phonemes: dict/en_full.phonemes
+spk_id: 26                 # train.py の既定（config の data.spk_map が優先）
+style_id: 0
+lab_unit: "100ns"
+save_wav: false
+
+layout: type_split
+db_root: "/Volumes/ssd2t/singing_database/en/NGYY_ENG_Dataset/NGYY_ENG_Lan"
+wav_dir: "wavs"
+wav: "wavs/{song}.wav"
+lab: "/Volumes/ssd2t/singing_database/_leapsinger_labels/ngyy/NGYY_ENG_Lan/{song}.lab"
+
+phon_norm:
+  "SP": pau
+  "AP": pau
+exclude: []

@@ -16,6 +16,10 @@ speaker into the graph; acoustic file becomes {model}.{spk}.onnx).
 fp32 by default (simple `torch.onnx.export`, the public-release default — none of the fp16
 machinery runs). Pass --fp16 for the ~32% smaller partial-fp16 build (see postprocess.py).
 
+The last post-export pass folds the excitation's unrolled harmonic sum (n_harm straight-line
+blocks) into one ONNX `Loop` (export/harmonic_loop.py): bit-identical output, ~5x lower peak
+memory in every ORT, faster session creation. --no-harmonic-loop keeps the unrolled chain.
+
 Output: {model}.onnx (fp32 unless --fp16), or {model}.{spk}.onnx when a speaker is baked;
 a style-bearing model adds .style{N} (e.g. {model}.{spk}.style1.onnx).
 """
@@ -42,6 +46,9 @@ def _vocab_size(model):
 
 def _validate(cfg, model, variant, speaker, style_id=0):
     """Hard checks: variant must match the ckpt's weight-level capabilities."""
+    if float(getattr(model, "x0_sigma", 0.0)) > 0:
+        raise SystemExit("This ckpt has x0_sigma > 0 (a reflow teacher or student), which cannot be exported yet: "
+                         "the Gaussian noise added to the starting point is not in the exported graph.")
     use_uv = bool(cfg.get("use_uv", True))
     has_style = getattr(model, "style_emb", None) is not None
     if has_style and not 0 <= style_id < model.style_emb.num_embeddings:
@@ -119,6 +126,13 @@ def main():
     # ORT (e.g. a very old runtime without the DFT kernel).
     ap.add_argument("--native-dft", dest="native_dft", action="store_true", default=True)
     ap.add_argument("--no-native-dft", dest="native_dft", action="store_false")
+    # Fold the excitation's unrolled harmonic sum into one ONNX `Loop` (export/harmonic_loop.py).
+    # Default on: ORT's default execution order runs the unrolled chain breadth-first and keeps
+    # ~n_harm sample-rate tensors alive at once (0.28 MB/frame, 1.5 GB for a 30 s phrase); the Loop
+    # is bit-identical and ~5x lower in peak memory. `Loop` exists since opset 1 and runs in every
+    # ORT. --no-harmonic-loop keeps the unrolled chain (e.g. to bisect a runtime problem).
+    ap.add_argument("--harmonic-loop", dest="harmonic_loop", action="store_true", default=True)
+    ap.add_argument("--no-harmonic-loop", dest="harmonic_loop", action="store_false")
     ap.add_argument("--deterministic", action="store_true",
                     help="zero the excitation noise (reproducible; for verification, not deployment)")
     ap.add_argument("--verify", action="store_true", help="run ORT parity vs PyTorch after export")
@@ -152,16 +166,23 @@ def main():
                       dynamic_axes=axes, do_constant_folding=True, dynamo=False)
     print(f"[export] fp32 -> {fp32_path} ({os.path.getsize(fp32_path)/1e6:.1f} MB)")
 
+    # --verify also compares the Loop graph with the unrolled one it came from, so keep that copy
+    unrolled_path = final_path + ".unrolled.onnx" if (args.verify and args.harmonic_loop) else None
     post.finalize(fp32_path, final_path, fp16=args.fp16, do_simplify=args.simplify,
-                  native_dft=args.native_dft)
+                  native_dft=args.native_dft, harmonic_loop=args.harmonic_loop,
+                  unrolled_out=unrolled_path)
     print(f"[export] final -> {final_path} ({os.path.getsize(final_path)/1e6:.1f} MB) "
-          f"fp16={args.fp16} simplify={args.simplify}")
+          f"fp16={args.fp16} simplify={args.simplify} harmonic_loop={args.harmonic_loop}")
     if final_path != fp32_path and os.path.exists(fp32_path):
         os.remove(fp32_path)
 
     if args.verify:
-        from .verify import verify_full_graph
+        from .verify import verify_full_graph, verify_harmonic_loop
         verify_full_graph(wrapper, final_path, input_names, fp16=args.fp16)
+        if unrolled_path:
+            verify_harmonic_loop(unrolled_path, final_path, input_names,
+                                 vocab=_vocab_size(model), hidden=model.hidden)
+            os.remove(unrolled_path)                      # kept only when the check failed
 
 
 if __name__ == "__main__":

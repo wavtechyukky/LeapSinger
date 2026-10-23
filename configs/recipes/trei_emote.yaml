@@ -1,0 +1,28 @@
+# Recipe: TREI CORPUS 1.0（Evillivy、10 種の歌い方）の 3 - CHARDONNAY - EMOTIONAL / EMOTE SONGS 18min。中核。
+# 無料なら合成器に使ってよい（公開するときは TREi と書く）。有料なら連絡が要る。ラベルは HTK（100 ns、vLabeler）。
+# qh = メリスマの中の再アタック、vk = 声の裏返り、vg = 立ち上がりの唸り、rr = 巻き舌の r（どれも辞書にある）。
+# h・e は hh・eh の書き間違い、rx は練習の中のごく短い r、_m・_r は音の終わりの印、ugh は 30 ms の間投詞。
+name: trei_emote
+phonemes: dict/en_full.phonemes
+spk_id: 15                 # train.py の既定（config の data.spk_map が優先）
+style_id: 0
+lab_unit: "100ns"
+save_wav: false
+
+layout: type_split
+db_root: "/Volumes/ssd2t/singing_database/en/TREI CORPUS 1.0/3 - CHARDONNAY - EMOTIONAL/EMOTE SONGS 18min"
+wav_dir: "wav"
+wav: "wav/{song}.wav"
+lab: "lab/{song}.lab"
+
+phon_norm:
+  "SP": pau
+  "AP": pau
+  "vf": vf
+  "h": hh
+  "e": eh
+  "rx": r
+  "_m": pau
+  "_r": pau
+  "ugh": pau
+exclude: []

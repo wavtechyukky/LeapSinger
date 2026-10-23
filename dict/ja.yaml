@@ -1,0 +1,23 @@
+# 言語パック: 日本語
+#
+# 音素の一覧は ja.phonemes を参照する（ここで重複して書かない）。ここには、一覧だけでは表せない音素の種類を置く。
+# コード（leapsinger/phonemes.py）は言語ごとの音素の名前を持たず、モデルや shard の音素の一覧と中身が一致する
+# 言語パックを dict/ から探して使う。
+#
+# 子音 = vowels にも silence にも入らない音素すべて（cl・無声化母音・Edge なども子音）。
+# 使う所: 子音の損失の重み（train.cons_weight）、評価（tools/eval_ab.py）の母音と子音の分け方、
+# ポストフィルタ（leapsinger/postfilter.py）。
+
+phonemes: ja.phonemes                    # dict/ からの相対パス
+vowels: [a, i, u, e, o, N, EP]          # 母音（撥音 N と、句末の独立した母音 EP を含む）
+silence: [pau, br, sil]                  # 静音（br・sil は前処理で pau に置き換わる）
+
+# ── 評価用（tools/eval_ab.py。無くても学習と評価は動く）───────────────────────────────
+# 子音の種類別の表: 無声化した母音・無声子音・有声子音。どれにも入らない子音は「その他」（cl・Edge など）
+devoiced: [A, I, U, E, O]
+voiceless: [k, ky, s, sh, t, ts, ch, ty, h, hy, f, fy, p, py]
+voiced: [g, gy, z, j, d, dy, n, ny, b, by, m, my, y, r, ry, w, v]
+steady_vowels: [a, i, u, e, o]           # 長い母音の中ほどの揺れを見る母音（書かなければ vowels）
+
+# 位置の条件の unit（核音素の単位の中の位置。今は使っていない）の既定の核音素（書かなければ vowels）
+nucleus: [a, i, u, e, o, A, I, U, E, O, N]
