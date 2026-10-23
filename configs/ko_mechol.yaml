@@ -5,10 +5,10 @@
 # Research only: Mechol-001 (part of this data) is under the Sds-Korean-Singing-Dataset terms (ask before distributing
 # a model with the data's characteristics; no commercial use); the rest was given to us privately.
 #
-# 0. Labels and audio: /Volumes/ssd2t/singing_database/_leapsinger_labels/mechol52 (configs/recipes/mechol52.yaml).
+# 0. Labels and audio: download/mechol52 (configs/recipes/mechol52.yaml; tools/convert_labels.py labdir).
 # 1. Preprocess (locally; RMVPE on CPU, one recipe at a time — never in parallel):
 #      python -m preprocess.run --recipe configs/recipes/mechol52.yaml         # -> data/mechol52
-#    The shards (shard.npz + metadata.json) are kept in research/leapsinger_data/<db>/.
+#    The shards (shard.npz + metadata.json) are kept in data/<db>/.
 # 2. Teacher (16-step flow, no GAN), then the 1-step student from its pairs:
 #      python -m train --config configs/ko_mechol.yaml --data_dirs <data>/mechol52 \
 #          --run_name ko_mechol_teacher --out_root <log> --device cuda

@@ -2,10 +2,10 @@
 # 使うのは Control_Group（技法を使わない普通の歌）だけ。技法のグループ・話し声は使わない。
 # tools/convert_labels.py gtsinger --split_sec 45 で IPA → Team CODA に変換したもの。同じ曲が 5 つの技法のフォルダに
 # 分かれているので曲ごとに区間をつなぎ（曲の番号と元の名前: <db_root>/songs.tsv）、RMVPE のメモリのため休みで 1 分ほどの片
-# （<曲>_sKKK）に切った（12〜14 分の 1 本では Mac が落ちかけた）。
+# （<曲>_sKKK）に切った（RMVPE はファイル全体を一度に処理する）。
 # ラベルと音声のずれが大きい区間（|ずれ| 40 ms 以上か、有声・無声の一致率 0.8 未満）は除いた:
-#   /Volumes/ssd2t/singing_database/_leapsinger_labels/gts_ko_t1_exclude.tsv（experiment/label_check/gts_segments.py で測った）
-# 元のデータ: /Volumes/ssd2t/singing_database/kr/GTSinger/Korean/KO-Tenor-1（48 kHz・24 bit。前処理で 44.1 kHz にする）
+#   download/gts_ko_t1_exclude.tsv（ラベルと音声の有声・無声の一致で測った）
+# 元のデータ: GTSinger の Korean/KO-Tenor-1（48 kHz・24 bit。前処理で 44.1 kHz にする）
 name: gts_ko_t1
 phonemes: dict/ko_coda.phonemes
 spk_id: 4                 # train.py の既定（config の data.spk_map が優先）
@@ -14,7 +14,7 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: from_lab
-db_root: "/Volumes/ssd2t/singing_database/_leapsinger_labels/gts_ko_t1"
+db_root: "download/gts_ko_t1"        # tools/convert_labels.py で整えたラベルと wav。絶対パスでもよい
 wav: "{song}.wav"
 lab: "{song}.lab"
 

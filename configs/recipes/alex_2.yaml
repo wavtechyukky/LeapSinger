@@ -9,7 +9,7 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: type_split
-db_root: "/Volumes/ssd2t/singing_database/en/Alex_Floarea_EN_Public_Corpus"
+db_root: "download/alex_2"        # 配布元のフォルダをそのまま置く。絶対パスでもよい
 wav_dir: "wavs"
 wav: "wavs/{song}.wav"
 lab: "wavs/{song}.lab"

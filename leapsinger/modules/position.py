@@ -10,15 +10,14 @@
       DiffSinger は続けて条件の列に GRU を通すが、ここでは入れていない（速度場ネットの dilated conv が
       前後を見る。GRU は 1 フレームずつ順に処理するので、長いフレーズで学習が遅くなる）。
   raised_cosine（旧。2026-10-16 の A/B の pos_agc）: p = i / (n − 1)（1 フレームの音素は 0.5）を
-      e_j = 0.5 + 0.5·cos(2π(p − j/K))、j = 0..K−1 で符号化して線形変換（0 と 1 が同じ符号）。SynthV 2 Pro
-      の解析から取った形なので新しい学習では使わない。古い ckpt を読むためだけに残す。ckpt の pos_cond に
-      encoding が無ければこちら。
+      e_j = 0.5 + 0.5·cos(2π(p − j/K))、j = 0..K−1 で符号化して線形変換（0 と 1 が同じ符号、周期的な符号化）。
+      新しい学習では使わない。古い ckpt を読むためだけに残す。ckpt の pos_cond に encoding が無ければこちら。
       unit（「核音素（母音・N）の開始 → 次の核音素の開始、または pau」を 1 単位とした単位内の位置。子音は
-      前の単位に属する。SynthV 2 Pro の「ノート頭 → 次のノート頭」をなぞったもの）もこちらでだけ使える。
+      前の単位に属する）もこちらでだけ使える。
 
 dur_cond: log(1 + 音素フレーム数) の線形埋め込み（DiffSinger の dur_embed）。別スイッチ。
 
-configs の既定（2026-10-17〜）: phoneme だけ on・sinusoidal。unit は使わない（SynthV のなぞりになるため）。
+configs の既定（2026-10-17〜）: phoneme だけ on・sinusoidal。unit は使わない（A/B で利点が無かった）。
 dur_cond は off（A/B で測れる効果が無かった）。
 
 ONNX: 学習では torch.searchsorted でフレーム→音素を引くが、legacy exporter は searchsorted / cummax /

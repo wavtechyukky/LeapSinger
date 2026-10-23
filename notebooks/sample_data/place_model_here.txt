@@ -3,9 +3,11 @@ Place a model checkpoint here.
 The LeapSinger acoustic model checkpoints are distributed as a GitHub Release asset,
 not committed to this repository. To run the notebook:
 
-  1. Download the release archive (LeapSinger_models.zip) and extract it.
+  1. Download a release archive and extract it:
+         LeapSinger_models_v2.0.0.zip  -> 3singer_v2_student.pt (the V2 reflow student; recommended)
+         LeapSinger_models_v0.1.0.zip  -> 3speaker_gan2d.pth, 3singer_ritsu3style_uv_gan2d.pth (V1, GAN)
   2. Copy one of the checkpoints into this folder, for example:
-         notebooks/sample_data/3speaker_gan2d.pth
+         notebooks/sample_data/3singer_v2_student.pt
   3. Make sure the notebook's PTH variable points to that file.
 
 Checkpoints placed here are ignored by git, so they will not be committed.

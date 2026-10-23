@@ -1,5 +1,12 @@
-# Publish only the two canonical training configs; everything else here is local/experimental.
+# Publish only the listed training configs; any other top-level configs/*.yaml is local/experimental.
 # Anchored with a leading "/", so this ignores only top-level configs/*.yaml — recipes/ is kept.
 /*.yaml
+!/3singer_v2.yaml
 !/3speaker_gan2d.yaml
 !/3singer_ritsu3style_uv_gan2d.yaml
+!/en_teacher.yaml
+!/zh_teacher.yaml
+!/ko_teacher.yaml
+!/ko_teacher_5spk.yaml
+!/ko_mechol.yaml
+!/ko_mechol_sodasoo.yaml

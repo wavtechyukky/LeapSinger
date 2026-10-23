@@ -1,7 +1,7 @@
 # Recipe: GTSinger の韓国語 KO-Soprano-1（女性 1 人）。CC BY-NC-SA 4.0（非商用・継承）。
 # 作り方は gts_ko_t1.yaml と同じ（Control_Group だけ、IPA → Team CODA、曲ごとにつないで 1 分ほどの片に切る、ずれの大きい区間を除く:
-#   /Volumes/ssd2t/singing_database/_leapsinger_labels/gts_ko_s1_exclude.tsv）。
-# 元のデータ: /Volumes/ssd2t/singing_database/kr/GTSinger/Korean/KO-Soprano-1
+#   download/gts_ko_s1_exclude.tsv）。
+# 元のデータ: GTSinger の Korean/KO-Soprano-1
 name: gts_ko_s1
 phonemes: dict/ko_coda.phonemes
 spk_id: 2                 # train.py の既定（config の data.spk_map が優先）
@@ -10,7 +10,7 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: from_lab
-db_root: "/Volumes/ssd2t/singing_database/_leapsinger_labels/gts_ko_s1"
+db_root: "download/gts_ko_s1"        # tools/convert_labels.py で整えたラベルと wav。絶対パスでもよい
 wav: "{song}.wav"
 lab: "{song}.lab"
 

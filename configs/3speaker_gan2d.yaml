@@ -34,8 +34,8 @@ model:
                           #   or harm at 20k, kept as a cheap structural hint
     encoding: sinusoidal  #   sinusoidal = DiffSinger's stretch embedding: round(1000*i/n) -> sinusoidal -> MLP.
                           #   raised_cosine = the 8-bin circular code of the 2026-10-16 A/B (old checkpoints only)
-    unit: false           #   0 -> 1 inside a "nucleus unit" (raised_cosine only). Not used: it mirrors SynthV 2
-                          #   Pro's note-head -> note-head position
+    unit: false           #   0 -> 1 inside a "nucleus unit" (vowel/N start -> next nucleus start or pau;
+                          #   raised_cosine only). Not used: no gain in the A/B
     bins: 8               #   raised_cosine only
     nucleus: [a, i, u, e, o, A, I, U, E, O, N]   # unit only
   dur_cond: false         # log(1 + phoneme frames) embedding (DiffSinger's dur_embed). No measurable effect (2026-10-17)

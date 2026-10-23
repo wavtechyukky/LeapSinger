@@ -3,8 +3,8 @@
 # GlassBead・MoltenHeart・모두가나를싫어해 → modugananeul）と、以前から手元にあった DOLLS のラベル。
 # tools/convert_labels.py lab で 1 つのフォルダにまとめたもの（5 ms 未満の隙間・重なりをそろえ、音声の終わりで切った。
 # caffeinism の 0.1 ms 以下の揺れと、末尾の SP が音声を 17 秒超えていた分）。元のデータ:
-#   /Volumes/ssd2t/singing_database/kr/SODAsoo-001-KR_Labeled/done/ と kr/Sds-Korean-Singing-Dataset-SODAsoo001/
-# ラベルと音声の一致は確認済み（research/doc/leapsinger_multilang_datasets_2026-10-18.md §3）。
+#   公開元の SODAsoo-001-KR_Labeled.zip と Sds-Korean-Singing-Dataset-SODAsoo001
+# ラベルと音声の一致は確認済み（ラベルと音声の有声・無声の一致、ずれ −10〜+5 ms）。
 # sh = i の前の s（시）を別の記号にしたもの。
 name: sds_sodasoo001
 phonemes: dict/ko_coda.phonemes
@@ -14,7 +14,7 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: from_lab
-db_root: "/Volumes/ssd2t/singing_database/_leapsinger_labels/sds_sodasoo001"
+db_root: "download/sds_sodasoo001"        # tools/convert_labels.py で整えたラベルと wav。絶対パスでもよい
 wav: "{song}.wav"
 lab: "{song}.lab"
 

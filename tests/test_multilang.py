@@ -247,7 +247,7 @@ def test_every_recipe_with_a_phoneme_list_has_a_language_pack_and_maps_into_it()
         assert find_lang(ph) is not None, name
         for src, dst in (r.get("phon_norm") or {}).items():
             assert dst in ph, (name, src, dst)
-    assert n == 40
+    assert n == 28                                                                          # NUS-48E の 12 本は公開版に無い
 
 
 def test_language_configs_match_the_recipes():

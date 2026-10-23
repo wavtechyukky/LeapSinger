@@ -1,8 +1,8 @@
 # Recipe: Sds-Korean-Singing-Dataset の Mechol-001（十代の男性 1 人、31.5 分の wav 1 本）。表記は Team CODA。
 # 公開元の規約（2026-10-18 改定）: データの特徴を出すモデルの配布は事前に問い合わせ、商用は不可。
-# 1 本のままだと、RMVPE が 31 分を一度に処理して 16 GB の Mac のメモリが危なく、曲単位で評価用に抜くこともできない。
+# 1 本のままだと、RMVPE が 31 分を一度に処理して RMVPE のメモリが足りなくなり、曲単位で評価用に抜くこともできない。
 # そこで tools/convert_labels.py lab --split_sec 60 で、0.3 秒以上の休みの真ん中で約 1 分ずつの 29 片
-# （mechol_natural_s000 … s028）に切った。元のデータ: /Volumes/ssd2t/singing_database/kr/Sds-Korean-Singing-Dataset-mechol001/
+# （mechol_natural_s000 … s028）に切った。元のデータ: Sds-Korean-Singing-Dataset の Mechol-001
 # exh = 句末の吐息、trash = 雑音の印（どちらも pau へ）。vf は音素のまま。
 name: sds_mechol001
 phonemes: dict/ko_coda.phonemes
@@ -12,7 +12,7 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: from_lab
-db_root: "/Volumes/ssd2t/singing_database/_leapsinger_labels/sds_mechol001"
+db_root: "download/sds_mechol001"        # tools/convert_labels.py で整えたラベルと wav。絶対パスでもよい
 wav: "{song}.wav"
 lab: "{song}.lab"
 

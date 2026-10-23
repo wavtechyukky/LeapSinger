@@ -1,6 +1,6 @@
 [project]
 name = "leapsinger"
-version = "0.1.0"
+version = "2.0.0"
 description = "Fast singing acoustic model: a sine-harmonic + white-noise excitation mel is refined into a realistic mel by a rectified flow (few reverse steps)."
 readme = "README.md"
 requires-python = ">=3.10"

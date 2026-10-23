@@ -2,11 +2,11 @@
 # Phoneme list dict/zh_opencpop.phonemes (language pack dict/zh_opencpop.yaml): pinyin initials + finals, with the
 # apical i split into ir / i0. Opencpop is CC BY-NC-ND 4.0: non-commercial research only.
 #
-# 1. Convert the labels (once; writes per-segment labs under /Volumes/ssd2t/singing_database/_leapsinger_labels):
-#      python tools/convert_labels.py opencpop --src /Volumes/ssd2t/singing_database/segments/transcriptions.txt \
-#          --out /Volumes/ssd2t/singing_database/_leapsinger_labels/opencpop \
-#          --split train=/Volumes/ssd2t/singing_database/segments/train.txt \
-#                  test=/Volumes/ssd2t/singing_database/segments/test.txt --split_i
+# 1. Convert the labels (once; writes per-segment labs under download/opencpop_labels):
+#      python tools/convert_labels.py opencpop --src download/opencpop/transcriptions.txt \
+#          --out download/opencpop_labels \
+#          --split train=download/opencpop/train.txt \
+#                  test=download/opencpop/test.txt --split_i
 # 2. Preprocess (locally; RMVPE on CPU, one recipe at a time): configs/recipes/opencpop_train.yaml and
 #    opencpop_test.yaml (-> data/opencpop_train, data/opencpop_test).
 # 3. Teacher, then the 1-step student:

@@ -1,8 +1,8 @@
 # Recipe: Opencpop の公式の評価用（5 曲）の区間（206 本）。CC BY-NC-ND 4.0（非商用）。女性 1 人。
 # ラベルは segments/transcriptions.txt の音素の長さなので、tools/convert_labels.py opencpop で lab に変換したものを読む
 # （i を ir・i0 に分けるなら --split_i。辞書には i・ir・i0 の 3 つともある）:
-#   python tools/convert_labels.py opencpop --src /Volumes/ssd2t/singing_database/segments/transcriptions.txt --out /Volumes/ssd2t/singing_database/_leapsinger_labels/opencpop \
-#       --split train=/Volumes/ssd2t/singing_database/segments/train.txt test=/Volumes/ssd2t/singing_database/segments/test.txt --split_i
+#   python tools/convert_labels.py opencpop --src download/opencpop/transcriptions.txt --out download/opencpop_labels \
+#       --split train=download/opencpop/train.txt test=download/opencpop/test.txt --split_i
 # SP = 無音、AP = はっきり聞こえる息（どちらも pau へ。日本語の息と同じく、学習の目標では消す）。
 name: opencpop_test
 phonemes: dict/zh_opencpop.phonemes
@@ -12,9 +12,9 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: from_lab
-db_root: "/Volumes/ssd2t/singing_database/segments"
+db_root: "download/opencpop"        # Opencpop の segments/ フォルダ。絶対パスでもよい
 wav: "wavs/{song}.wav"
-lab: "/Volumes/ssd2t/singing_database/_leapsinger_labels/opencpop/test/{song}.lab"
+lab: "download/opencpop_labels/test/{song}.lab"
 
 phon_norm:
   "SP": pau

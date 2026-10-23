@@ -10,7 +10,7 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: type_split
-db_root: "/Volumes/ssd2t/singing_database/en/TREI CORPUS 1.0/1 - CABERNET -SOLID/SOLID SONGS 47min"
+db_root: "download/trei_solid_songs"        # 配布元のフォルダをそのまま置く。絶対パスでもよい
 wav_dir: "wav"
 wav: "wav/{song}.wav"
 lab: "lab/{song}.lab"

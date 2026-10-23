@@ -1,7 +1,6 @@
 # English singing model — the GAN-free reflow teacher (the recipe adopted for Japanese on 2026-10-18), on the
 # English datasets on hand. Phoneme list dict/en_full.phonemes (language pack dict/en_full.yaml).
-# Non-commercial research only: several datasets forbid publishing a model of their voice without permission
-# (research/doc/leapsinger_multilang_datasets_2026-10-18.md).
+# Non-commercial research only: several datasets forbid publishing a model of their voice without permission (see each dataset's terms).
 # NUS-48E is not used (2026-10-19: too weak as teacher data).
 # Result (2026-10-19, run en_teacher, 50k): poor; even the vocoded ground truth has dropouts and echo. English is
 # parked; this config is kept as is.
@@ -15,7 +14,7 @@
 #          included)
 #    optional: trei_solid_extra (fry / crack drills), trei_grit (growl), trei_rap. Not used: trei_screamo_* (F0 is
 #    unreliable there).
-#    The shards (shard.npz + metadata.json) are kept in research/leapsinger_data/<db>/.
+#    The shards (shard.npz + metadata.json) are kept in data/<db>/.
 # 2. Teacher (16-step flow, no GAN), then the 1-step student from its pairs:
 #      python -m train --config configs/en_teacher.yaml --data_dirs <data>/<db> ... --run_name en_teacher \
 #          --out_root <log> --device cuda

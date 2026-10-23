@@ -18,9 +18,9 @@
 # Research only: the Sds terms (2026-10-18) require asking before distributing a model with the data's
 # characteristics, and forbid commercial use; GTSinger is non-commercial and share-alike.
 #
-# 0. Labels and audio: /Volumes/ssd2t/singing_database/_leapsinger_labels/<db> (see each recipe).
+# 0. Labels and audio: download/<db> (see each recipe).
 # 1. Preprocess (locally; RMVPE on CPU, one recipe at a time — never in parallel). The shards (shard.npz +
-#    metadata.json) are kept in research/leapsinger_data/<db>/.
+#    metadata.json) are kept in data/<db>/.
 # 2. Teacher (16-step flow, no GAN), then the 1-step student from its pairs:
 #      python -m train --config configs/ko_teacher_5spk.yaml --data_dirs <data>/sds_mechol001 <data>/sds_sodasoo001 \
 #          <data>/gts_ko_s1 <data>/gts_ko_s2 <data>/gts_ko_t1 --run_name ko5_teacher --out_root <log> --device cuda

@@ -8,7 +8,7 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: type_split
-db_root: "/Volumes/ssd2t/singing_database/en/Project-AIdol-Public-English-Dataset"
+db_root: "download/aidol"        # 配布元のフォルダをそのまま置く。絶対パスでもよい
 wav_dir: "wav"
 wav: "wav/{song}.wav"
 lab: "lab/{song}.lab"

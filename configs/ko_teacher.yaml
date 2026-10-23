@@ -5,13 +5,13 @@
 # Research only: the upstream terms (2026-10-18) require asking before distributing a model with the data's
 # characteristics, and forbid commercial use.
 #
-# 0. The labels and audio were tidied into /Volumes/ssd2t/singing_database/_leapsinger_labels/sds_{mechol001,sodasoo001}
+# 0. The labels and audio were tidied into download/sds_{mechol001,sodasoo001}
 #    by tools/convert_labels.py lab (Mechol cut into 29 pieces of ~1 min at pauses; SODAsoo's caffeinism gaps filled
 #    with --fill_gaps). See the recipes.
 # 1. Preprocess (locally; RMVPE on CPU, one recipe at a time — never in parallel):
 #      python -m preprocess.run --recipe configs/recipes/sds_mechol001.yaml     # -> data/sds_mechol001
 #      python -m preprocess.run --recipe configs/recipes/sds_sodasoo001.yaml    # -> data/sds_sodasoo001
-#    The shards (shard.npz + metadata.json) are kept in research/leapsinger_data/<db>/.
+#    The shards (shard.npz + metadata.json) are kept in data/<db>/.
 # 2. Teacher (16-step flow, no GAN), then the 1-step student from its pairs:
 #      python -m train --config configs/ko_teacher.yaml --data_dirs <data>/sds_mechol001 <data>/sds_sodasoo001 \
 #          --run_name ko_teacher --out_root <log> --device cuda

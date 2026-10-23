@@ -4,7 +4,7 @@
 # tools/convert_labels.py labdir --prefix mechol_ --split_sec 60 --skip 2_46 で整えたもの:
 #   2 分を超える 010 だけ 1 分ほどの 29 片（RMVPE のメモリのため）。末尾の SP が音声を超える 21 本は音声の長さで切った。
 #   2_46 はラベルが別のテイクのもの（音声の休みと 1 秒近く食い違う）なので除いた。
-# 元のデータ: /Volumes/ssd2t/singing_database/kr/52min/{wav,lab}
+# 元のデータ: Mechol さんから受け取った wav/ と lab/ のフォルダ（download/mechol52_src）
 # phon_norm の後半は、1 回ずつ出てくる書き間違いの写像。
 name: mechol52
 phonemes: dict/ko_coda.phonemes
@@ -14,7 +14,7 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: from_lab
-db_root: "/Volumes/ssd2t/singing_database/_leapsinger_labels/mechol52"
+db_root: "download/mechol52"        # tools/convert_labels.py で整えたラベルと wav。絶対パスでもよい
 wav: "{song}.wav"
 lab: "{song}.lab"
 

@@ -10,7 +10,7 @@ lab_unit: "100ns"
 save_wav: false
 
 layout: per_song
-db_root: "/Volumes/ssd2t/singing_database/en/Kumi AI Dataset"
+db_root: "download/kumi"        # 配布元のフォルダをそのまま置く。絶対パスでもよい
 wav: "{song}/{song}.wav"
 lab: "{song}/{song}.lab"
 
