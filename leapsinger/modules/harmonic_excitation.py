@@ -66,7 +66,16 @@ def _harm_sum(phase: torch.Tensor, f0_up: torch.Tensor, kk: torch.Tensor,
     ph = phase.unsqueeze(1)                                            # [B,1,n]
     fu = f0_up.unsqueeze(1)                                            # [B,1,n]
     aa = (kk * fu < nyq).to(phase.dtype)                              # [B,H,n] anti-alias
-    return (torch.sin(kk * ph) * kk.pow(-decay) * aa).sum(dim=1)      # [B,n]
+    return (torch.sin(kk * ph) * _amp(kk, decay) * aa).sum(dim=1)     # [B,n]
+
+
+def _amp(kk: torch.Tensor, decay: float) -> torch.Tensor:
+    """1/k^decay（[1,H,1]）。inductor の CPU カーネルは、整数でない pow（と exp·log、外から渡した振幅の
+    テンソル）を [B,H,n] の要素ごとに計算して 2 倍遅くなる（7 秒の句で 87 → 180 ms）。既定の 1.5 は
+    reciprocal·rsqrt で書く（値は pow と 1 ulp 程度の差）。"""
+    if decay == 1.5:
+        return kk.reciprocal() * kk.rsqrt()
+    return kk.pow(-decay)
 
 
 _harm_sum_c = (torch.compile(_harm_sum, dynamic=True)
@@ -84,7 +93,8 @@ def _harm_sum_loop(phase: torch.Tensor, f0_up: torch.Tensor,
 
 def _harmonics(phase: torch.Tensor, f0_up: torch.Tensor, n_harm: int,
                nyq: float, decay: float) -> torch.Tensor:
-    """compile 融合版があればそれを、無ければ（compile 非対応/opt-out）メモリ安全なループ。"""
+    """compile 融合版があればそれを、無ければ（compile 非対応/opt-out）メモリ安全なループ。
+    CPU でも融合版が速い（7 秒の句で 87 ms。ループは 4 スレッドで 135 ms、1 スレッドで 400 ms）。"""
     if _harm_sum_c is not None:
         kk = torch.arange(1, n_harm + 1, device=phase.device,
                           dtype=phase.dtype).view(1, -1, 1)

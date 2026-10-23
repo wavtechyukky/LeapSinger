@@ -31,7 +31,7 @@ The non-v/uv model (top) lays harmonics across every frame. The v/uv model (bott
 Through a lot of experiments we found two things: a high-quality neural vocoder for singing is sensitive to the *texture* of the mel, and the hard part for an acoustic model is drawing clean periodic content. LeapSinger starts not from noise but from a pseudo-mel that already has the shape of the pitch, so it avoids the hardest part — learning to draw the periodic content. This design gives:
 
 - **High-quality periodic content** — it draws clean, low-noise periodic content stably. This helps both the texture of the vocoder output and how well each speaker's voice is reproduced.
-- **Speed** — there is only one reverse step, so even on a single CPU core the RTF is under 0.03. In V2 the 16-step teacher exists only during training; its knowledge is moved into a 1-step student (the student is not significantly different from the teacher, and inference stays one step).
+- **Speed** — there is only one reverse step; on 4 CPU cores the RTF is about 0.02 (about 50× faster than real time). In V2 the 16-step teacher exists only during training; its knowledge is moved into a 1-step student (the student is not significantly different from the teacher, and inference stays one step).
 
 Other features:
 
@@ -50,21 +50,21 @@ Other features:
 
 RTF (Real-Time Factor) measured on CPU. Smaller is faster; below 1 means faster than real time.
 
-RTF per acoustic model, comparing Python native vs. ONNX across core counts:
+RTF of the V2 release model (`3singer_v2_student.pt`), Python native vs. ONNX across core counts:
 
-| Cores | Python native | ONNX |
-|:--:|--:|--:|
-| 1 | 0.023 | 0.066 |
-| 2 | 0.021 | 0.047 |
-| 4 | 0.020 | 0.042 |
-| 8 | 0.021 | 0.060 |
-| 10 | 0.021 | 0.062 |
+| Cores | Python native | ONNX (hop 512) | ONNX (hop 256) |
+|:--:|--:|--:|--:|
+| 1 | 0.057 | 0.050 | 0.051 |
+| 2 | 0.033 | 0.033 | 0.033 |
+| 4 | 0.020 | 0.025 | 0.026 |
+| 8 | 0.018 | 0.036 | 0.035 |
+| 10 | 0.017 | 0.036 | 0.035 |
 
-- **Python native** is a single step, so it barely depends on core count. Even on one core the RTF is 0.023 (about 43× faster than real time).
-- **ONNX** is a few times slower than native because of onnxruntime overhead, but it is still more than 15× faster than real time. 4 cores are fastest; 8 or more is actually slower, because the excitation sums its harmonics one at a time — which is what keeps memory independent of the input length — and that sum does not parallelise across cores.
+- **Python native** reaches RTF 0.020 on 4 cores (about 50× faster than real time) and 0.017 on 10. The one-step velocity network is light; most of the time is the excitation's harmonic sum (a `torch.compile` fused kernel), which parallelises across cores.
+- **ONNX** is fastest on 4 cores, RTF 0.025 (40× faster than real time); 8 or more is actually slower, because the harmonic sum is folded into one sequential `Loop` — which is what keeps memory independent of the input length — and that loop does not parallelise across cores. Hop 512 and 256 make no difference.
 - **The NHVSing vocoder** runs at RTF under 0.1 on CPU (see the NHVSing repository for details).
 
-(Measured on Apple Silicon, 10 cores, onnxruntime CPU, a real 7.0-second phrase, median of 9 runs. The ONNX build is `export/cli.py` with its defaults, `--variant diffsinger --hop 512`. Results vary by machine. The V2 student is the same network plus a small position embedding and still runs in one step, so the RTF is unchanged.)
+(Measured on an Apple M4 (10 cores = 4P + 6E), 16 GB, PyTorch 2.11, onnxruntime 1.23, a real 7.0-second phrase, median of 9 runs. The ONNX builds are `export/cli.py` with `--variant diffsinger --speaker embed` and `--hop 512` / `--hop 256`. Native is `infer.infer_mel`, excluding the first-call compile. The v0.1.0 model measured under the same conditions gives the same numbers (0.021 on 4 cores), so V2 is not slower. Results vary by machine.)
 
 The frame settings are 44.1 kHz and hop size 256. Hop size 512 is handled by averaging each pair of adjacent frames.
 

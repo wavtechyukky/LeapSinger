@@ -853,6 +853,8 @@ def main():
     sr = int(cfg["mel"]["sr"])
     voc, vc = None, tr.get("vocoder")
     if vc:
+        if not (os.path.isabs(vc) or os.path.exists(vc)):          # config の相対パスはリポジトリから
+            vc = os.path.join(os.path.dirname(os.path.abspath(__file__)), vc)
         try:
             voc = load_vocoder(vc); print(f"[eval] vocoder loaded ({vc})")
         except Exception as e:                        # noqa: BLE001
