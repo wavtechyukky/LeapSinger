@@ -21,7 +21,8 @@ blocks) into one ONNX `Loop` (export/harmonic_loop.py): bit-identical output, ~5
 memory in every ORT, faster session creation. --no-harmonic-loop keeps the unrolled chain.
 
 Output: {model}.onnx (fp32 unless --fp16), or {model}.{spk}.onnx when a speaker is baked;
-a style-bearing model adds .style{N} (e.g. {model}.{spk}.style1.onnx).
+a style-bearing model adds .style{N} (e.g. {model}.{spk}.style1.onnx). With --speaker embed,
+{model}.speakers.json holds every speaker's spk_embed vector and the phoneme list.
 """
 from __future__ import annotations
 
@@ -175,6 +176,13 @@ def main():
           f"fp16={args.fp16} simplify={args.simplify} harmonic_loop={args.harmonic_loop}")
     if final_path != fp32_path and os.path.exists(fp32_path):
         os.remove(fp32_path)
+    if args.speaker == "embed":
+        # The graph takes an H-dim spk_embed; give the host every speaker's vector (and the phoneme
+        # list behind `tokens`) so the ONNX is usable on its own.
+        spk_path = os.path.join(args.out, f"{args.model_name}.speakers.json")
+        table = spk.write_speakers_json(model, cfg, spk_path)
+        print(f"[export] speakers -> {spk_path} ({len(table['speakers'])} speakers, dim {table['dim']}, "
+              f"{len(table['phonemes'])} phonemes)")
 
     if args.verify:
         from .verify import verify_full_graph, verify_harmonic_loop

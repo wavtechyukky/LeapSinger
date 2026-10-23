@@ -188,6 +188,23 @@ def align_pos_cond_to_ckpt(cfg: dict, ck_cfg: dict):
     return cur, new
 
 
+def load_init_checkpoint(cfg: dict, path: str) -> dict:
+    """--init_from の ckpt を読み、モデルを作る前に cfg の構造（位置の条件）をその ckpt に合わせる（cfg を書き換える）。
+    古い ckpt（v0.1.0 など。config に pos_cond が無い）に新しい config（pos_cond on）を組み合わせても strict に
+    読めるようにするため。再開（align_pos_cond_to_ckpt）と同じ規則。励起の設定が違えば表示するだけ（重みは無い）。"""
+    ck = torch.load(path, map_location="cpu", weights_only=False)
+    ck_cfg = ck.get("config") or {}
+    changed = align_pos_cond_to_ckpt(cfg, ck_cfg)
+    if changed:
+        print(f"[init_from] 位置の条件を {os.path.basename(path)} に合わせます: (phoneme, unit, encoding, bins, dur_cond) "
+              f"{changed[0]} -> {changed[1]}")
+    exc = excitation_changes(cfg, ck_cfg)
+    if exc:
+        print(f"[init_from] 励起の設定を {os.path.basename(path)} から変えて始めます: "
+              + ", ".join(f"{k} {a} -> {b}" for k, (a, b) in exc.items()))
+    return ck
+
+
 def lr_factor(step: int, decay: float, every: int) -> float:
     """学習率の倍率 decay ** (step / every)。毎 step なめらかに下げる（decay = 1 で一定）。
     例: decay 0.8・every 5000 は DiffSinger の StepLR(5000, 0.8) と同じ減り方で、20k で 0.41、35k で 0.21、50k で 0.11 倍。"""
@@ -576,9 +593,10 @@ def main():
     ap.add_argument("--phonemes", default=None,
                     help="phoneme list file (default: shard metadata / bundled Japanese)")
     ap.add_argument("--init_from", default=None,
-                    help="finetune 起点の flow ckpt（G 重みのみ読み込み）")
+                    help="新しい run の起点にする ckpt（G の重みだけ読む。step/optimizer は新しく、D は新規）。"
+                         "構造（位置の条件）はその ckpt に合わせるので、古い ckpt でもよい")
     ap.add_argument("--finetune", action="store_true",
-                    help="init_from の G 重みだけ読み、step/optimizer をリセット・D は新規（GAN post-filter）")
+                    help="（互換のため残してある。--init_from だけで同じ動き）")
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VAL",
                     help="config の点区切り上書き（繰り返し可）。例: --set model.pos_cond.phoneme=true")
     args = ap.parse_args()
@@ -634,6 +652,10 @@ def main():
         if _old_code and _old_code.get("sha1") != code["sha1"]:
             print(f"[resume] コードが {_ckpts[-1].name} を作ったときと違います: {describe_code(_old_code)} -> "
                   f"{describe_code(code)}。同じ条件で続けるなら、そのときのコードに戻してください")
+    # --init_from（新しい run を別の ckpt の G の重みから始める）: 構造もその ckpt に合わせる。再開中は無視
+    _init_ck = None
+    if args.init_from and _resume_ck is None:
+        _init_ck = load_init_checkpoint(cfg, args.init_from)
 
     # ── data（データ供給の足場）────────────────────────────
     dcfg = cfg.get("data", {})
@@ -910,10 +932,10 @@ def main():
             except Exception as e: print(f"[resume] d_optimizer skipped ({e})")  # noqa: BLE001
         step = int(ck.get("step", 0))
         print(f"[resume] {_ckpts[-1].name} -> step {step}")
-    elif args.init_from and args.finetune:            # GAN post-filter: G 重みのみ・D 新規・step 0
-        ck = torch.load(args.init_from, map_location=device)
+    elif _init_ck is not None:                        # G の重みだけ・D 新規・step 0（GAN の後段や追加学習の起点）
+        ck, _init_ck = _init_ck, None
         model.load_state_dict(ck["model"])
-        print(f"[finetune] G weights <- {args.init_from} (D fresh, step 0)")
+        print(f"[init_from] G weights <- {args.init_from} (D fresh, step 0)")
     ck = None                                         # 読んだ ckpt を学習中ずっと抱えない
 
     # 学習率: train.lr_decay < 1 なら毎 step なめらかに下げる（lr_factor）。判別器の d_lr も同じ倍率で
