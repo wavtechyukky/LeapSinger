@@ -187,10 +187,13 @@ def load_vocoder(onnx_path: str, sr: int = 44100):
     return v
 
 
-def mel_to_wav(vocoder, mel: np.ndarray, f0_logf0: np.ndarray, uv: np.ndarray) -> np.ndarray:
+def mel_to_wav(vocoder, mel: np.ndarray, f0_logf0: np.ndarray, uv: np.ndarray,
+               normalize: bool = True) -> np.ndarray:
     """mel [n_mels, T] + F0/uv -> waveform via the bundled NHVSing ONNX vocoder.
     mel -> [1,T,128], f0 (Hz = 2**f0_logf0) -> [1,1,T], uv -> [1,1,T] in the vocoder's convention
-    (1 = unvoiced), i.e. `1 - voiced`. Our F0 is already gap-less, so no interpolation is needed."""
+    (1 = unvoiced), i.e. `1 - voiced`. Our F0 is already gap-less, so no interpolation is needed.
+    The result is peak-normalised to 0.95; `normalize=False` keeps the vocoder's own level (the one
+    the mel describes)."""
     mel_t = np.ascontiguousarray(np.asarray(mel).T[None], dtype=np.float32)            # [1,T,128]
     T = mel_t.shape[1]
 
@@ -202,5 +205,7 @@ def mel_to_wav(vocoder, mel: np.ndarray, f0_logf0: np.ndarray, uv: np.ndarray) -
     uv_in = (1.0 - _fit(uv))[None, None].astype(np.float32)                            # [1,1,T] (1=unvoiced)
     wav = np.asarray(vocoder.session.run(
         ["waveform"], {"mel": mel_t, "f0": f0hz, "uv": uv_in})[0]).reshape(-1)
+    if not normalize:
+        return wav
     peak = float(np.abs(wav).max())
     return wav / peak * 0.95 if peak > 1e-6 else wav

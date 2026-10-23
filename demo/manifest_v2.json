@@ -7,10 +7,11 @@
  "audio_suffix": "v2",
  "img_suffix": "_v2",
  "score_suffix": "_v2",
- "ckpt": "ckpt_020000.pt",
+ "ckpt": "3singer_v2_student.pt",
  "steps": 1,
  "seed": 0,
  "mel_l1_note": "mel_l1_target is the L1 to the training target (the loudness-corrected GT mel), not comparable with V1's mel_l1 against the raw GT",
+ "audio_level": "match_gt",
  "speakers": [
   {
    "id": "oniku",
@@ -20,31 +21,36 @@
      "name": "fujino_yama_0000",
      "split": "train",
      "sec": 5.5,
-     "mel_l1_target": 0.37
+     "mel_l1_target": 0.37,
+     "gain_db": 3.9
     },
     {
      "name": "hamabeno_uta_0003",
      "split": "train",
      "sec": 6.7,
-     "mel_l1_target": 0.372
+     "mel_l1_target": 0.372,
+     "gain_db": 3.2
     },
     {
      "name": "kachushano_uta_0005",
      "split": "train",
      "sec": 5.3,
-     "mel_l1_target": 0.344
+     "mel_l1_target": 0.344,
+     "gain_db": 3.1
     },
     {
      "name": "sakura_sakura_0001",
      "split": "eval",
      "sec": 5.7,
-     "mel_l1_target": 0.48
+     "mel_l1_target": 0.48,
+     "gain_db": 3.2
     },
     {
      "name": "sakura_sakura_0006",
      "split": "eval",
      "sec": 5.8,
-     "mel_l1_target": 0.498
+     "mel_l1_target": 0.498,
+     "gain_db": 2.6
     }
    ]
   },
@@ -56,31 +62,36 @@
      "name": "12_0001",
      "split": "train",
      "sec": 3.8,
-     "mel_l1_target": 0.29
+     "mel_l1_target": 0.29,
+     "gain_db": 3.3
     },
     {
      "name": "1_0012",
      "split": "train",
      "sec": 4.8,
-     "mel_l1_target": 0.283
+     "mel_l1_target": 0.283,
+     "gain_db": 3.8
     },
     {
      "name": "23_0002",
      "split": "train",
      "sec": 4.7,
-     "mel_l1_target": 0.329
+     "mel_l1_target": 0.329,
+     "gain_db": 1.2
     },
     {
      "name": "46_0006",
      "split": "eval",
      "sec": 4.7,
-     "mel_l1_target": 0.492
+     "mel_l1_target": 0.492,
+     "gain_db": -0.3
     },
     {
      "name": "46_0016",
      "split": "eval",
      "sec": 5.0,
-     "mel_l1_target": 0.582
+     "mel_l1_target": 0.582,
+     "gain_db": 2.4
     }
    ]
   },
@@ -92,31 +103,36 @@
      "name": "FACE_0000",
      "split": "train",
      "sec": 4.8,
-     "mel_l1_target": 0.481
+     "mel_l1_target": 0.481,
+     "gain_db": 3.9
     },
     {
      "name": "byebye_aimai_sound_0009",
      "split": "train",
      "sec": 4.7,
-     "mel_l1_target": 0.491
+     "mel_l1_target": 0.491,
+     "gain_db": 1.5
     },
     {
      "name": "dokomademomukuni_0000",
      "split": "train",
      "sec": 3.9,
-     "mel_l1_target": 0.432
+     "mel_l1_target": 0.432,
+     "gain_db": 3.5
     },
     {
      "name": "FlashBlack_0004",
      "split": "eval",
      "sec": 4.2,
-     "mel_l1_target": 0.572
+     "mel_l1_target": 0.572,
+     "gain_db": 1.0
     },
     {
      "name": "night_shief_0002",
      "split": "eval",
      "sec": 5.5,
-     "mel_l1_target": 0.612
+     "mel_l1_target": 0.612,
+     "gain_db": 3.4
     }
    ]
   }
@@ -135,5 +151,17 @@
    "title": "Kirakiraboshi · きらきら星"
   }
  ],
- "scores_note": "The same excerpt as V1 (from the first note, the same length). F0 and phoneme durations come from the current pitch and duration models, so the difference from V1 in this section is not only the acoustic model. Vocoder NHVSing V3.2.1."
+ "audio_note": "Audio is gain-matched to each recording's RMS for listening. The V2 model sings at a constant level (its training target, −30 dB), so its own output sits a few dB below these recordings; the mel figures are at that level, the same for the model mel and the vocoded mel.",
+ "scores_gain_db": {
+  "oniku_furusato": -3.3,
+  "oniku_haru_no_ogawa": -2.5,
+  "oniku_kirakira_boshi": -2.7,
+  "natsume_furusato": -3.8,
+  "natsume_haru_no_ogawa": -3.7,
+  "natsume_kirakira_boshi": -2.7,
+  "ritsu_furusato": -4.0,
+  "ritsu_haru_no_ogawa": -3.8,
+  "ritsu_kirakira_boshi": -2.5
+ },
+ "scores_note": "The same excerpt as V1 (from the first note, the same length), gain-matched to V1's RMS. F0 and phoneme durations come from the current pitch and duration models, so the difference from V1 in this section is not only the acoustic model. Vocoder NHVSing V3.2.1."
 }

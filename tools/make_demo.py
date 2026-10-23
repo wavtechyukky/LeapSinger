@@ -64,6 +64,29 @@ def write_ogg(path: Path, wav: np.ndarray, sr: int) -> None:
              format="OGG", subtype="VORBIS")
 
 
+def rms_db(x: np.ndarray) -> float:
+    return float(20.0 * np.log10(np.sqrt(np.mean(np.square(np.asarray(x, dtype=np.float64)))) + 1e-9))
+
+
+def read_mono(path: Path):
+    import soundfile as sf
+    x, sr = sf.read(str(path), dtype="float32")
+    if x.ndim > 1:
+        x = x.mean(axis=1)
+    return x, int(sr)
+
+
+def match_level(x: np.ndarray, ref: np.ndarray):
+    """Scale `x` to the RMS of `ref` (peak kept under 0.99). Returns (scaled, gain_db actually applied)."""
+    gain_db = rms_db(ref) - rms_db(x)
+    y = x * 10 ** (gain_db / 20)
+    peak = float(np.abs(y).max()) if len(y) else 0.0
+    if peak > 0.99:
+        y *= 0.99 / peak
+        gain_db += 20 * np.log10(0.99 / peak)
+    return y.astype(np.float32), float(gain_db)
+
+
 def save_mel_png(mel: np.ndarray, path: Path, vmin: float, vmax: float, size=MEL_PNG_SIZE) -> None:
     """A bare mel image (no axes) of exactly `size` pixels, magma, the same colour scale as the other figures."""
     from matplotlib import colormaps
@@ -156,8 +179,11 @@ def cmd_render(args) -> None:
         "ckpt": Path(args.ckpt).name, "steps": args.steps, "seed": args.seed,
         "mel_l1_note": "mel_l1_target is the L1 to the training target (the loudness-corrected GT mel), "
                        "not comparable with V1's mel_l1 against the raw GT",
+        "audio_level": args.level,
         "speakers": [], "scores": [],
     }
+    if args.note:
+        man["audio_note"] = args.note
     for s in like["speakers"]:
         out_s = {"id": s["id"], "name": s["name"], "phrases": []}
         for p in s["phrases"]:
@@ -165,16 +191,22 @@ def cmd_render(args) -> None:
             stem = f"{s['id']}_{p['name']}"
             mel = infer_mel(model, it, num_steps=args.steps, device="cpu", seed=args.seed)
             vuv = it["uv"] if use_uv else np.ones_like(it["uv"])      # as train.py's previews
-            wav = mel_to_wav(voc, mel, it["f0_logf0"], vuv)
-            write_ogg(DEMO / "audio" / f"{stem}_{man['audio_suffix']}.ogg", wav, sr)
+            wav = mel_to_wav(voc, mel, it["f0_logf0"], vuv, normalize=False)   # the level the mel describes
             save_mel_png(mel, DEMO / "img" / f"{stem}{man['img_suffix']}_pred.png", vmin, vmax)
-            voc_mel = wav_to_mel_nhv(wav, sr=sr, hop=hop)
+            voc_mel = wav_to_mel_nhv(wav, sr=sr, hop=hop)            # same level as the model mel
             save_mel_png(voc_mel, DEMO / "img" / f"{stem}{man['img_suffix']}_voc.png", vmin, vmax)
+            gain_db = 0.0
+            gt_path = DEMO / "audio" / f"{stem}_gt.ogg"
+            if args.level == "match_gt" and gt_path.exists():        # listen at the recording's level
+                gt, _gsr = read_mono(gt_path)
+                wav, gain_db = match_level(wav, gt)
+            write_ogg(DEMO / "audio" / f"{stem}_{man['audio_suffix']}.ogg", wav, sr)
             T = min(mel.shape[1], it["target_mel"].shape[1])
             l1 = float(np.mean(np.abs(mel[:, :T] - it["target_mel"][:, :T])))
             out_s["phrases"].append({"name": p["name"], "split": split, "sec": round(T / frame_rate, 1),
-                                     "mel_l1_target": round(l1, 3)})
-            print(f"[{tag}] {stem}  {split}  {T / frame_rate:.1f}s  L1(target) {l1:.3f}", flush=True)
+                                     "mel_l1_target": round(l1, 3), "gain_db": round(gain_db, 1)})
+            print(f"[{tag}] {stem}  {split}  {T / frame_rate:.1f}s  L1(target) {l1:.3f}  gain {gain_db:+.1f} dB",
+                  flush=True)
         man["speakers"].append(out_s)
     save_manifest(man, manifest_path(tag))
     print(f"wrote {manifest_path(tag)}")
@@ -219,11 +251,13 @@ def cmd_scores(args) -> None:
             if x.ndim > 1:
                 x = x.mean(axis=1)
             info = ""
-            if ref is not None:                        # the same excerpt as the reference version
+            if ref is not None:                        # the same excerpt and level as the reference version
                 rp = DEMO / "audio" / f"svs_{s['id']}_{key}{ref['score_suffix']}.ogg"
                 if rp.exists():
                     x, t0, dur = trim_like(x, sr, rp, args.trim_fade)
-                    info = f"  (cut to {ref['label']}'s excerpt: from {t0:.2f}s, {dur:.1f}s)"
+                    x, gain_db = match_level(x, read_mono(rp)[0])
+                    man.setdefault("scores_gain_db", {})[f"{s['id']}_{key}"] = round(gain_db, 1)
+                    info = f"  (cut to {ref['label']}'s excerpt: from {t0:.2f}s, {dur:.1f}s; gain {gain_db:+.1f} dB)"
             write_ogg(DEMO / "audio" / f"svs_{s['id']}_{key}{man['score_suffix']}.ogg", x, sr)
             keys.setdefault(key, set()).add(s["id"])
             print(f"[{args.tag}] svs_{s['id']}_{key}: {len(x) / sr:.1f}s{info}", flush=True)
@@ -361,6 +395,9 @@ def build_html(mans: list) -> str:
              f"phonemes taken from each recording. Columns: the original audio, the synthesis by {cols}, the "
              "<b>GT mel</b>, and for each version the <b>model's mel</b> (top) with the mel of the "
              f"<b>vocoded output</b> (bottom).{note_l1}</p>")
+    notes = [f"<li><b>{esc(m['label'])}</b>: {esc(m['audio_note'])}</li>" for m in mans if m.get("audio_note")]
+    if notes:
+        h.append('<ul class="versions">' + "".join(notes) + "</ul>")
     for s in speakers:
         h.append(f"<h3>{esc(s['name'])}</h3>")
         head = ("<tr><th>phrase</th><th>GT audio</th>" + "".join(f"<th>{esc(l)} audio</th>" for l in labels)
@@ -459,6 +496,10 @@ def main() -> None:
     r.add_argument("--steps", type=int, default=1)
     r.add_argument("--seed", type=int, default=0)
     r.add_argument("--threads", type=int, default=2, help="torch の CPU スレッド数")
+    r.add_argument("--level", choices=["match_gt", "raw"], default="match_gt",
+                   help="音声のレベル: match_gt = 句ごとに GT の RMS に合わせる（既定）、raw = ボコーダ出力のまま。"
+                        "mel の図はどちらでもボコーダ出力のレベル（モデルの mel と同じ）")
+    r.add_argument("--note", default="", help="この版の第 1 節への注記（音声のレベルなど）")
     r.set_defaults(fn=cmd_render)
 
     s = sub.add_parser("scores", help="楽譜から歌わせた wav を ogg にして manifest に足す")
@@ -467,7 +508,7 @@ def main() -> None:
     s.add_argument("--like", default=str(DEMO / "manifest_v1.json"), help="曲の表示名を取る manifest")
     s.add_argument("--alias", nargs="*", default=[], help="wav の名前 → ページの曲名（例 kirakiraboshi=kirakira_boshi）")
     s.add_argument("--trim_like", default=None, metavar="TAG",
-                   help="曲をその版の抜粋と同じ範囲に切る（最初の音から同じ長さ。V1 のデモは曲の頭だけ）")
+                   help="曲をその版の抜粋と同じ範囲に切り（最初の音から同じ長さ。V1 のデモは曲の頭だけ）、RMS も揃える")
     s.add_argument("--trim_fade", type=float, default=0.2, help="切った末尾のフェードアウト（秒）")
     s.add_argument("--note", default="", help="この版の第 2 節への注記")
     s.set_defaults(fn=cmd_scores)
