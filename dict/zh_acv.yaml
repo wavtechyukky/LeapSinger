@@ -1,0 +1,15 @@
+# 言語パック: 中国語（zh_acv.phonemes。ArchiVoice の ACV 表記）
+#
+# 書き方と使われ方は ja.yaml と同じ。母音 = 介音を含んだ主母音とハミング M。
+# 子音 = vowels にも silence にも入らない音素すべて（声母・ゼロ声母の頭 y w rr・cl・vf・韻尾 ii U N ng）。
+# 韻尾は韓国語の終声と同じく、主母音の後ろでノートの中に残る（PrettyPitch の dict/zh_acv.yaml と同じ分け方）。
+
+phonemes: zh_acv.phonemes
+vowels: [a, A, e, E, er, i, I, i0, ih, ie, ia, iA, iO, O, u, ua, uo, uA, uE, V, yu, yI, yE, M]
+silence: [pau, SP, AP]                   # SP・AP は前処理で pau に置き換わる
+
+# ── 評価用（tools/eval_ab.py）────────────────────────────────────────────────
+# 普通話の b d g j zh z は無気の無声音。韻尾は声のある音（vf・cl は「その他」）
+voiceless: [b, p, d, t, g, k, f, h, j, q, x, zh, ch, sh, z, c, s]
+voiced: [m, n, l, r, y, w, rr, ii, U, N, ng]
+steady_vowels: [a, A, e, E, er, i, I, i0, ih, O, u, V, yu]   # 介音で動く主母音と M は外す

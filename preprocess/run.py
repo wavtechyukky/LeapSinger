@@ -46,17 +46,46 @@ def _enumerate_songs(recipe: dict, db_root: str) -> list[str]:
     raise ValueError(f"unknown layout: {layout}")
 
 
-def _check_song(paths: dict, lab_unit: str, phon_norm: dict, lab_fix, vocab) -> dict:
+def _drop_fix(lab_fix, drop: tuple):
+    """The recipe's `drop_phones` (symbol prefixes, e.g. `en/` for the English words in a Mandarin song): the rows
+    whose symbol starts with one of them become `pau`, after the song's own lab_fix. The phrases that touch them are
+    dropped by `_drop_spans`, so the audio under those rows never reaches a shard."""
+    if not drop:
+        return lab_fix
+
+    def fix(segs):
+        segs = lab_fix(segs) if lab_fix is not None else segs
+        return [(s, e, "pau" if p.startswith(drop) else p) for s, e, p in segs]
+    return fix
+
+
+def _drop_spans(lab_path: str, lab_unit: str, lab_fix, drop: tuple) -> list:
+    """[[start, end], ...] in seconds of the rows `drop_phones` matches (process_file drops every phrase that
+    overlaps one)."""
+    if not drop:
+        return []
+    from .lab import read_lab
+    segs = read_lab(lab_path, lab_unit)
+    if lab_fix is not None:
+        segs = lab_fix(segs)
+    return [[s, e] for s, e, p in segs if p.startswith(drop)]
+
+
+def _check_song(paths: dict, lab_unit: str, phon_norm: dict, lab_fix, vocab, drop: tuple = ()) -> dict:
     """--check: read one song's lab the way process_file does, without touching the audio samples."""
     import soundfile as sf
     from .lab import DEFAULT_SIL_MAP, read_lab
     segs = read_lab(paths["lab"], lab_unit)
     if lab_fix is not None:
         segs = lab_fix(segs)
+    n_drop = sum(1 for _s, _e, p in segs if drop and p.startswith(drop))
+    if drop:
+        segs = _drop_fix(None, drop)(segs)
     unknown = sorted({p for _s, _e, p in segs if phon_norm.get(p, DEFAULT_SIL_MAP.get(p, p)) not in vocab})
     end = max((e for _s, e, _p in segs), default=0.0)
     dur = sf.info(paths["wav"]).duration
-    return dict(unknown=unknown, lab_sec=sum(e - s for s, e, _p in segs), over_sec=end - dur, wav_sec=dur)
+    return dict(unknown=unknown, lab_sec=sum(e - s for s, e, _p in segs), over_sec=end - dur, wav_sec=dur,
+                dropped=n_drop)
 
 
 def run_recipe(recipe_path: str, out_root: str = "data",
@@ -91,6 +120,7 @@ def run_recipe(recipe_path: str, out_root: str = "data",
     prefix = r.get("name_prefix", "")
     hook = recipes.load(r.get("hook", r["name"]))     # per-singer code module, if any
     has_fix = hook is not None and hasattr(hook, "fix_lab")
+    drop = tuple(r.get("drop_phones") or ())
 
     n_ok = 0
     for s in songs:
@@ -108,7 +138,8 @@ def run_recipe(recipe_path: str, out_root: str = "data",
             process_file(name, paths["lab"], paths["wav"], out_dir, mel=mel,
                          save_wav=bool(r.get("save_wav", False)),
                          f0_device=r.get("f0_device", "cpu"),
-                         lab_unit=lab_unit, phon_norm=phon_norm, lab_fix=lab_fix, vocab=vocab)
+                         exclude_spans=_drop_spans(paths["lab"], lab_unit, lab_fix, drop) or None,
+                         lab_unit=lab_unit, phon_norm=phon_norm, lab_fix=_drop_fix(lab_fix, drop), vocab=vocab)
         except Exception as e:  # noqa: BLE001 — keep going, report the failing song
             print(f"  [FAIL] {s}: {e}")
             continue
@@ -127,7 +158,8 @@ def _check_recipe(r: dict, db_root: str, limit, vocab) -> int:
         songs = songs[:limit]
     phon_norm = r.get("phon_norm", {}) or {}
     hook = recipes.load(r.get("hook", r["name"]))
-    unknown, n_ok, lab_sec, wav_sec, over = {}, 0, 0.0, 0.0, []
+    drop = tuple(r.get("drop_phones") or ())
+    unknown, n_ok, lab_sec, wav_sec, over, dropped = {}, 0, 0.0, 0.0, [], {}
     for s in songs:
         paths = {k: recipes.resolve_song_file(db_root, r[k], s) for k in ("wav", "lab")}
         missing = [k for k, p in paths.items() if not os.path.exists(p)]
@@ -135,7 +167,9 @@ def _check_recipe(r: dict, db_root: str, limit, vocab) -> int:
             print(f"  [MISS {','.join(missing)}] {s}")
             continue
         lab_fix = (lambda iv, _s=s: hook.fix_lab(_s, iv)) if hook is not None and hasattr(hook, "fix_lab") else None
-        c = _check_song(paths, r.get("lab_unit", "100ns"), phon_norm, lab_fix, vocab)
+        c = _check_song(paths, r.get("lab_unit", "100ns"), phon_norm, lab_fix, vocab, drop)
+        if c["dropped"]:
+            dropped[s] = c["dropped"]
         for p in c["unknown"]:
             unknown.setdefault(p, []).append(s)
         if c["over_sec"] > 0.05:
@@ -151,6 +185,9 @@ def _check_recipe(r: dict, db_root: str, limit, vocab) -> int:
     if over:
         print(f"  labels run past the audio end (> 50 ms) in {len(over)} songs, at most {max(o for _s, o in over):.2f} s"
               f" ({over[0][0]} ...)")
+    if dropped:
+        print(f"  drop_phones {list(drop)}: {sum(dropped.values())} rows in {len(dropped)} songs "
+              f"({', '.join(sorted(dropped))}); the phrases around them are left out")
     return n_ok
 
 

@@ -1,0 +1,74 @@
+# 音素インベントリ: 中国語（普通話。ArchiVoice の ACV 表記、https://github.com/Archivoice/AV-diffsinger-Chinese-support）
+#
+# id = 行順、id 0 は pau（pad / 無音）。行を挿入・並べ替えしないこと。足すときは末尾へ。
+# 韻母を「介音を含んだ主母音」と「韻尾」に分ける表記（xiao = x iA U、kuai = k ua ii、juan = j yE N、
+# xiong = x iO ng）。ゼロ声母の音節は y w rr で始まる（ya = y a、wa = w a、yue = rr E）。
+# 無音（SP）・息（AP）と、息の仲間の記号（mlem・exh・axh・hx）はレシピの phon_norm で pau に写す（configs/recipes/）。
+
+pau                 # 0: silence / pad
+
+# 声母 21
+b
+p
+m
+f
+d
+t
+n
+l
+g
+k
+h
+j
+q
+x
+zh
+ch
+sh
+r
+z
+c
+s
+
+# ゼロ声母の頭 3（rr = ü の半母音: yue = rr E）
+y
+w
+rr
+
+# 声門の音 2
+cl                  # 声門閉鎖・急な止め
+vf                  # ボーカルフライ（音節の頭で母音の直前に付く）
+
+# 介音を含んだ主母音 23
+a
+A                   # ang の a
+e
+E                   # ei・ye の e
+er
+i
+I                   # ing・yin の i
+i0                  # zi ci si の i
+ih                  # zhi chi shi ri の i
+ie
+ia
+iA                  # xiao・xiang の ia
+iO                  # liu・xiong の io
+O                   # ong・ou・wo の o
+u
+ua
+uo
+uA                  # zhuang の ua
+uE                  # dui・gui の ue
+V                   # dun・lun の e
+yu
+yI                  # jun・yun の ü
+yE                  # jue・juan の üe
+
+# 韻尾 4
+ii                  # ai・ei の i
+U                   # ao・ou の u
+N                   # an・en の n
+ng                  # ang・eng・ong の ng
+
+# ハミング（full_length 版の M。分割版では m と書かれるが、声母 m と分けて持つ）
+M

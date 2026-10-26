@@ -162,6 +162,7 @@ F0の抽出にはRMVPEを使います（RMVPEはマルチプロセスで動か�
 - レシピに `phonemes: dict/<一覧>.phonemes` を書くと、そのデータの音素の一覧になります（`--phonemes` が優先）。
 - `--check` を付けると、音声は処理せずにラベルだけを確かめます。見るのは、音素の一覧に無い記号（`phon_norm` と無音の写像の後）、wav やラベルの欠け、ラベルが音声の終わりを超える長さです。何も書きません。
 - `layout: from_lab` は、ラベルのファイルがある曲だけを読みます（`lab` のテンプレートは絶対パスでもよい）。
+- `drop_phones: [en/]` のように記号の頭を書くと、その記号を含むフレーズを丸ごと除きます（中国語の曲の中の英単語など。例: `configs/recipes/acv001_cn.yaml`）。
 - 音素の長さしか持たないラベル（Opencpop の `transcriptions.txt`、DiffSinger の `transcriptions.csv`）、HTK の lab を整えるもの（`lab`、`labdir`）、GTSinger の IPA ラベルは、`tools/convert_labels.py` で区間ごとの lab に変換してから読みます。
 - レシピに `save_wav: true` を書くと、フレーズごとの波形も `shard_wav.npz` に残します（音量補正チューナーの試聴と、`train.pitch_aug` に要ります）。
 

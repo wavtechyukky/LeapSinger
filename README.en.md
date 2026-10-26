@@ -162,6 +162,7 @@ F0 is extracted with RMVPE. (Please do not run RMVPE across multiple processes.)
 - A recipe can name its phoneme list with `phonemes: dict/<list>.phonemes` (`--phonemes` takes precedence).
 - `--check` only checks the labels, without processing audio. It reports symbols missing from the phoneme list (after `phon_norm` and the silence map), missing wav or label files, and labels that run past the end of the audio. It writes nothing.
 - `layout: from_lab` reads only the songs that have a label file (the `lab` template may be an absolute path).
+- `drop_phones: [en/]` lists symbol prefixes: every phrase containing such a symbol is left out (for example the English words inside a Mandarin song; see `configs/recipes/acv001_cn.yaml`).
 - Labels that only hold phoneme durations (Opencpop's `transcriptions.txt`, DiffSinger's `transcriptions.csv`), HTK labs that need tidying (`lab`, `labdir`) and GTSinger's IPA labels are converted to per-segment labs with `tools/convert_labels.py` first.
 - `save_wav: true` in a recipe also keeps each phrase's waveform in `shard_wav.npz` (needed for playback in the loudness-correction tuner and for `train.pitch_aug`).
 

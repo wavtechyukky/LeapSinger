@@ -15,7 +15,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 os.environ.setdefault("LEAPSINGER_EXC_COMPILE", "0")
 
-LANG_CONFIGS = ("en_teacher", "ko_teacher", "ko_teacher_5spk", "ko_mechol", "ko_mechol_sodasoo", "zh_teacher")
+LANG_CONFIGS = ("en_teacher", "ko_teacher", "ko_teacher_5spk", "ko_mechol", "ko_mechol_sodasoo", "zh_teacher", "zh_acv")
 
 
 def _recipes():
@@ -234,6 +234,22 @@ def test_check_reports_unknown_phonemes_and_overruns_without_writing(tmp_path, c
     assert run_recipe(path, out_root=str(out_root), check=True, vocab=Vocab.load()) == 0
 
 
+def test_drop_phones_turns_the_rows_into_pau_and_reports_their_spans(tmp_path, capsys):
+    from preprocess.run import _drop_fix, _drop_spans, run_recipe
+    _tiny_db(tmp_path)
+    path, _ = _recipe(tmp_path, drop_phones=["zz"])                                         # b の zz を除く記号にする
+    assert run_recipe(path, out_root=str(tmp_path / "data"), check=True) == 2
+    assert "drop_phones ['zz']: 1 rows in 1 songs (b)" in capsys.readouterr().out
+    lab = tmp_path / "mix.lab"                                                              # 中国語の曲の中の英単語
+    lab.write_text("0 1000000 SP\n1000000 2000000 n\n2000000 4000000 i\n4000000 5000000 en/l\n"
+                   "5000000 7000000 en/ay\n7000000 9000000 SP\n", encoding="utf-8")
+    assert np.allclose(_drop_spans(str(lab), "100ns", None, ("en/",)), [[0.4, 0.5], [0.5, 0.7]])
+    assert _drop_spans(str(lab), "100ns", None, ()) == []
+    rows = _drop_fix(None, ("en/",))([(0.0, 0.1, "n"), (0.1, 0.2, "en/l"), (0.2, 0.3, "i")])
+    assert [p for _s, _e, p in rows] == ["n", "pau", "i"]
+    assert _drop_fix(None, ()) is None                                                      # 無ければ lab_fix のまま
+
+
 # ── レシピと言語ごとの設定のつじつま ────────────────────────────────────────
 
 def test_every_recipe_with_a_phoneme_list_has_a_language_pack_and_maps_into_it():
@@ -247,7 +263,7 @@ def test_every_recipe_with_a_phoneme_list_has_a_language_pack_and_maps_into_it()
         assert find_lang(ph) is not None, name
         for src, dst in (r.get("phon_norm") or {}).items():
             assert dst in ph, (name, src, dst)
-    assert n == 28                                                                          # NUS-48E の 12 本は公開版に無い
+    assert n == 30                                                                          # NUS-48E の 12 本は公開版に無い
 
 
 def test_language_configs_match_the_recipes():

@@ -1,0 +1,28 @@
+# Recipe: ACV-002 の中国語（普通話）の曲。ACV-001 と同じ人が女声で歌ったもの（ArchiVoice、Jonathan Huang さん）、
+# 19 曲・約 54 分（無音込み）。19 曲のうち 11 曲は ACV-001 と同じ曲。音の高さは ACV-001 より平均で約 9 半音高い。
+# https://github.com/Archivoice/ACV-002 （CC BY-SA 4.0）。表記は ACV の中国語（dict/zh_acv.phonemes）。
+# full_length_samples の labs/<曲>.lab と wavs/<曲>.wav（HTK 100 ns）をそのまま使う。
+# 記号の扱いは acv001_cn.yaml と同じ。
+name: acv002_cn
+name_prefix: acv002_
+phonemes: dict/zh_acv.phonemes
+spk_id: 1                 # train.py の既定（config の data.spk_map が優先）
+style_id: 0
+lab_unit: "100ns"
+save_wav: false
+
+layout: from_lab
+db_root: "download/ACV-002/full_length_samples"
+wav: "wavs/{song}.wav"
+lab: "labs/{song}.lab"
+
+drop_phones: ["en/"]
+phon_norm:
+  "SP": pau
+  "AP": pau
+  "mlem": pau
+  "exh": pau
+  "axh": pau
+  "hx": pau
+  "vf": vf                # 既定の無音の写像（vf → pau）より優先する
+exclude: []
