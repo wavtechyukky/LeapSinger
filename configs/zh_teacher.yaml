@@ -1,20 +1,21 @@
-# Mandarin singing model (Opencpop) — the GAN-free reflow teacher (the recipe adopted for Japanese on 2026-10-18).
-# Phoneme list dict/zh_opencpop.phonemes (language pack dict/zh_opencpop.yaml): pinyin initials + finals, with the
-# apical i split into ir / i0. Opencpop is CC BY-NC-ND 4.0: non-commercial research only.
+# Mandarin singing model (Opencpop, one female singer) — the V2 recipe (GAN-free teacher, then a 1-step student),
+# like configs/3singer_v2.yaml. Phoneme list dict/zh_opencpop.phonemes (language pack dict/zh_opencpop.yaml): pinyin
+# initials + finals, with the apical i split into ir / i0. Opencpop is CC BY-NC-ND 4.0: non-commercial research only.
 #
 # 1. Convert the labels (once; writes per-segment labs under download/opencpop_labels):
 #      python tools/convert_labels.py opencpop --src download/opencpop/transcriptions.txt \
 #          --out download/opencpop_labels \
 #          --split train=download/opencpop/train.txt \
 #                  test=download/opencpop/test.txt --split_i
-# 2. Preprocess (locally; RMVPE on CPU, one recipe at a time): configs/recipes/opencpop_train.yaml and
-#    opencpop_test.yaml (-> data/opencpop_train, data/opencpop_test).
-# 3. Teacher, then the 1-step student:
-#      python -m train --config configs/zh_teacher.yaml --data_dirs <data>/opencpop_train <data>/opencpop_test \
-#          --run_name zh_teacher --out_root <log> --device cuda
-#      python -m train --config configs/zh_teacher.yaml --data_dirs (same) --run_name zh_student \
-#          --out_root <log> --device cuda --max_updates 20000 \
-#          --set train.reflow_teacher=<log>/zh_teacher/ckpt_035000.pt --set train.reflow_teacher_steps=16 \
+# 2. Preprocess (locally; RMVPE on CPU, one recipe at a time):
+#      python -m preprocess.run --recipe configs/recipes/opencpop_train.yaml     # -> data/opencpop_train
+#      python -m preprocess.run --recipe configs/recipes/opencpop_test.yaml      # -> data/opencpop_test
+# 3. Teacher (50k steps), then the 1-step student (20k steps from the teacher's weights):
+#      python -m train --config configs/zh_teacher.yaml --data_dirs data/opencpop_train data/opencpop_test \
+#          --run_name zh_teacher --out_root log --device cuda
+#      python -m train --config configs/zh_teacher.yaml --data_dirs data/opencpop_train data/opencpop_test \
+#          --run_name zh_student --out_root log --device cuda --max_updates 20000 \
+#          --set train.reflow_teacher=log/zh_teacher/ckpt_050000.pt --set train.reflow_teacher_steps=16 \
 #          --set train.num_steps=1 --set train.lr=2.0e-4
 mel:
   sr: 44100
@@ -51,14 +52,14 @@ excitation:
   harm_decay: 1.5
   x0_sigma: 0.0
 train:
-  lr: 8.0e-4
+  lr: 8.0e-4              # the student overrides this with --set train.lr=2.0e-4
   grad_clip: 1.0
   optimizer: radam
   lr_decay: 0.8
   lr_decay_steps: 5000
   amp: bf16
   amp_fp32_io: true
-  max_updates: 35000      # 50000 for the final teacher
+  max_updates: 50000      # teacher. The student runs with --max_updates 20000
   max_batch_frames: 120000
   max_batch_size: 64
   min_batch_items: 16
@@ -66,13 +67,17 @@ train:
   flow_loss: l2
   cons_weight: 1.0        # consonant loss weight (consonants = the initials). 1.0 = off
   cons_weight_next_ms: 30
-  num_steps: 16
+  num_steps: 16           # the teacher solves the flow in 16 Euler steps. The student overrides this with 1
+  reflow_draws: 4
+  reflow_algorithm: euler
+  reflow_t: zero
+  reflow_seed: 0
   save_interval: 1000
   log_interval: 50
   eval_interval: 2000
   eval_items: 3
   eval_gen_metrics: true
-  vocoder: checkpoints/nhv_v3_2_1.onnx   # not yet checked on Mandarin: listen to the vocoded GT in TensorBoard first
+  vocoder: checkpoints/nhv_v3_2_1.onnx   # not yet checked on this data: listen to the vocoded GT in TensorBoard first
   num_workers: 4
   pitch_aug: false
   balance_speakers: true

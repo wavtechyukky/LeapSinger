@@ -14,7 +14,7 @@ save_wav: false
 layout: from_lab
 db_root: "download/opencpop"        # Opencpop の segments/ フォルダ。絶対パスでもよい
 wav: "wavs/{song}.wav"
-lab: "download/opencpop_labels/train/{song}.lab"
+lab: "../opencpop_labels/train/{song}.lab"   # db_root から見た相対（= download/opencpop_labels/train）。絶対パスでもよい
 
 phon_norm:
   "SP": pau
