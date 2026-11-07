@@ -1,0 +1,94 @@
+# English singing model on the Project AI❤dol Public English Dataset alone (one female singer, 57 songs,
+# 1.76 h; CC BY-SA 4.0). Same model and training as configs/3singer_v2.yaml (V2: a 50k-step teacher, then the
+# 1-step student), with this one speaker. Phoneme list dict/en_full.phonemes.
+# Publishing a model of this voice needs the singer's permission in advance (see the dataset's terms).
+#
+# 1. Preprocess (locally; RMVPE on CPU):
+#      python -m preprocess.run --recipe configs/recipes/aidol.yaml          # -> data/aidol
+# 2. Teacher (50k steps), then the 1-step student (20k steps from the teacher's weights):
+#      python -m train --config configs/en_aidol.yaml --data_dirs data/aidol \
+#          --run_name aidol_teacher --out_root log --device cuda
+#      python -m train --config configs/en_aidol.yaml --data_dirs data/aidol \
+#          --run_name aidol_student --out_root log --device cuda --max_updates 20000 \
+#          --set train.reflow_teacher=log/aidol_teacher/ckpt_050000.pt --set train.reflow_teacher_steps=16 \
+#          --set train.num_steps=1 --set train.lr=2.0e-4
+#    A consonant-loss-weight run adds --set train.cons_weight=<factor> to both (and gets its own run names).
+mel:
+  sr: 44100
+  hop: 256
+  n_fft: 2048
+  win: 2048
+  n_mels: 128
+  fmin: 40.0
+  fmax: 16000.0
+model:
+  hidden: 256
+  backbone_ch: 256
+  n_cycles: 3
+  dilation_schedule: pow2_15
+  encoder_type: attn
+  spk_dim: 32
+  n_speakers: 1
+  n_styles: 0
+  use_uv: false
+  flow_loss: l2
+  mel_vmin: -11.5
+  mel_vmax: 2.0
+  pos_cond:
+    phoneme: true
+    encoding: sinusoidal
+    unit: false
+    bins: 8
+  dur_cond: false
+excitation:
+  n_harm: 256
+  noise_ratio: 0.05
+  exc_scale: 0.15
+  harm_decay: 1.5
+  x0_sigma: 0.0
+train:
+  lr: 8.0e-4              # the student overrides this with --set train.lr=2.0e-4
+  grad_clip: 1.0
+  optimizer: radam
+  lr_decay: 0.8
+  lr_decay_steps: 5000
+  amp: bf16
+  amp_fp32_io: true
+  max_updates: 50000      # teacher. The student runs with --max_updates 20000
+  max_batch_frames: 120000
+  max_batch_size: 64
+  min_batch_items: 16
+  recon_weight: 0.5
+  flow_loss: l2
+  cons_weight: 1.0        # consonant loss weight. 1.0 = off
+  cons_weight_next_ms: 30
+  num_steps: 16           # the teacher solves the flow in 16 Euler steps. The student overrides this with 1
+  reflow_draws: 4
+  reflow_algorithm: euler
+  reflow_t: zero
+  reflow_seed: 0
+  save_interval: 1000
+  log_interval: 50
+  eval_interval: 2000
+  eval_items: 3
+  eval_gen_metrics: true
+  vocoder: checkpoints/nhv_v3_2_1.onnx
+  num_workers: 4
+  pitch_aug: false
+  balance_speakers: true
+gan:
+  enabled: false
+data:
+  spk_map:
+    aidol: 0
+  eval_songs: 2           # songs held out of training for evaluation
+  min_sec: 0.3
+  max_sec: 30
+  silence: true
+  silence_fade_sec: 0.05
+  loudness_agc:
+    sigma_sec: 1.0
+    target_db: -30.0
+    k: 1.0
+    max_gain_db: 12.0
+    max_cut_db: 12.0

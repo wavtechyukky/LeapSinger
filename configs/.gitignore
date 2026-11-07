@@ -5,6 +5,7 @@
 !/3speaker_gan2d.yaml
 !/3singer_ritsu3style_uv_gan2d.yaml
 !/en_teacher.yaml
+!/en_aidol.yaml
 !/zh_teacher.yaml
 !/zh_acv.yaml
 !/ko_teacher.yaml

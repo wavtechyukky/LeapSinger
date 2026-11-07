@@ -143,7 +143,7 @@ The Japanese phoneme list is in `dict/ja.phonemes` (one phoneme per line, the or
 
 Phoneme classes that the list cannot express go in a language pack, `dict/<language>.yaml` (for example `dict/ja.yaml` and `dict/en.yaml`). It points to the phoneme list with `phonemes` and defines `vowels` and `silence`; every other phoneme is a consonant. For the evaluation tool it can also list `devoiced` (devoiced vowels), `voiceless` and `voiced` consonants, and `steady_vowels` (vowels whose long middles are checked for wobble); these are optional. Training and evaluation look in `dict/` for the language pack whose phoneme list matches the model's or the data's. The consonant loss weight (`train.cons_weight`) needs a language pack.
 
-Bundled dictionaries and language packs: Japanese `ja` (the released models), English `en` (CMUdict's 39 phonemes + 6) and `en_full` (54, with the symbols common in singing labels), Korean `ko_coda` (Team CODA's romanisation, 37 phonemes), Mandarin `zh_opencpop` (pinyin initials and finals, 61 phonemes).
+Bundled dictionaries and language packs: Japanese `ja` (the released models), English `en` (CMUdict's 39 phonemes + 6) and `en_full` (54, with the symbols common in singing labels), Korean `ko_coda` (Team CODA's romanisation, 37 phonemes), Mandarin `zh_opencpop` (pinyin initials and finals, 61 phonemes) and `zh_acv` (ACV's notation, 55 phonemes).
 
 ### Preprocessing
 
