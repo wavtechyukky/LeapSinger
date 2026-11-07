@@ -1,0 +1,34 @@
+# Recipe: Team CODA の表記でラベルを付けた韓国語の歌声データ（歌い手 1 人）。wav/ と lab/（HTK、100 ns）に分かれた
+# フォルダを tools/convert_labels.py labdir で整え、download/ko_coda に置いたものを読む:
+#   python tools/convert_labels.py labdir --src <wav/ と lab/ のあるフォルダ> --out download/ko_coda --prefix ko_ \
+#       [--skip <名前>,...]
+#   2 分を超える音声だけ 1 分ほどの片に切る（RMVPE のメモリのため）。ラベルの末尾の SP が音声を超えるものは音声の長さで切る。
+#   ラベルが音声と合わないもの（別のテイクのラベルなど）は --skip で除く。
+# phon_norm: 無音・息の記号は pau に、vf はそのまま。後半は Team CODA の表記に無い書き間違いの写像（データに合わせて足す）。
+name: ko_coda
+phonemes: dict/ko_coda.phonemes
+spk_id: 0                 # train.py の既定（config の data.spk_map が優先）
+style_id: 0
+lab_unit: "100ns"
+save_wav: false
+
+layout: from_lab
+db_root: "download/ko_coda"         # tools/convert_labels.py で整えたラベルと wav。絶対パスでもよい
+wav: "{song}.wav"
+lab: "{song}.lab"
+
+phon_norm:
+  "SP": pau
+  "AP": pau
+  "exh": pau
+  "trash": pau
+  "vf": vf
+  "Sp": pau
+  "sh": s
+  "hh": h
+  "R": r
+  "O": o
+  "D": d
+  "ng": NG
+  "uu": u
+exclude: []

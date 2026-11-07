@@ -15,7 +15,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 os.environ.setdefault("LEAPSINGER_EXC_COMPILE", "0")
 
-LANG_CONFIGS = ("en_teacher", "ko_teacher", "ko_teacher_5spk", "ko_mechol", "ko_mechol_sodasoo", "zh_teacher", "zh_acv")
+LANG_CONFIGS = ("en_teacher", "ko_teacher", "ko_teacher_5spk", "ko_coda", "zh_teacher", "zh_acv")
 
 
 def _recipes():
@@ -263,7 +263,7 @@ def test_every_recipe_with_a_phoneme_list_has_a_language_pack_and_maps_into_it()
         assert find_lang(ph) is not None, name
         for src, dst in (r.get("phon_norm") or {}).items():
             assert dst in ph, (name, src, dst)
-    assert n == 30                                                                          # NUS-48E の 12 本は公開版に無い
+    assert n == 30                                                                        # NUS-48E の 12 本は公開版に無い
 
 
 def test_language_configs_match_the_recipes():

@@ -14,8 +14,8 @@
   # --fill_gaps: 音素の間の 5 ms 以上の隙間を、音声の有声・無声を見て埋める（SODAsoo の caffeinism に 57 個）
   python tools/convert_labels.py lab --src song.lab --wav song.wav --out <out> [--name NAME] [--split_sec 60] [--fill_gaps]
 
-  # wav/ と lab/ に分かれたフォルダをまとめて（Mechol の 52 分など）。2 分を超えるものだけ 1 分ほどの片に切る
-  python tools/convert_labels.py labdir --src /path/to/52min --out <out> --prefix mechol_ [--skip 2_46]
+  # wav/ と lab/ に分かれたフォルダをまとめて（Team CODA の表記のデータなど）。2 分を超えるものだけ 1 分ほどの片に切る
+  python tools/convert_labels.py labdir --src /path/to/folder --out <out> --prefix ko_ [--skip <名前>,...]
 
   # GTSinger の韓国語（IPA）。歌い手 1 人の Control_Group だけを、曲ごとに 1 本につないで Team CODA の lab にする
   # （つないだ曲は 10 分を超えることがあり、RMVPE がメモリを使い切るので --split_sec で 1 分ほどの片に切る）
@@ -381,7 +381,7 @@ def main():
                     help="lab・gtsinger: 長い音声をこの長さ以上の片に、休みの真ん中で切る（RMVPE のメモリのため）")
     ap.add_argument("--snap_ms", type=float, default=5.0, help="lab: これ未満の隙間・重なりをそろえる")
     ap.add_argument("--prefix", default=None,
-                    help="gtsinger・labdir: 書き出す名前の頭（例 gts_ko_t1 → gts_ko_t1_song00、mechol_ → mechol_2_0）")
+                    help="gtsinger・labdir: 書き出す名前の頭（例 gts_ko_t1 → gts_ko_t1_song00、ko_ → ko_2_0）")
     ap.add_argument("--split_long", type=float, default=120.0, help="labdir: これより長い音声だけ --split_sec で切る")
     ap.add_argument("--skip", default="", help="labdir: 使わない名前（カンマ区切り）")
     ap.add_argument("--group", default="Control_Group", help="gtsinger: 使うグループのフォルダ名")

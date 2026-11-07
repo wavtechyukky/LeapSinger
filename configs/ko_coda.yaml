@@ -1,20 +1,19 @@
-# Korean singing model, Mechol only (a teenage man, ~52 min) — the GAN-free reflow teacher (the recipe adopted for
-# Japanese). The voice meant for the SVS; configs/ko_mechol_sodasoo.yaml adds SODAsoo to cover Mechol's weak range.
+# Korean singing model on one singer's Team CODA-labelled data (configs/recipes/ko_coda.yaml) — the GAN-free reflow
+# teacher (the recipe adopted for Japanese), then the 1-step student.
 # Phoneme list dict/ko_coda.phonemes (language pack dict/ko_coda.yaml): Team CODA's romanisation. PrettyPitch's Korean
 # F0 and consonant-duration models (dict/ko.phonemes there) use the same phoneme list and the same speaker id 0.
-# Research only: Mechol-001 (part of this data) is under the Sds-Korean-Singing-Dataset terms (ask before distributing
-# a model with the data's characteristics; no commercial use); the rest was given to us privately.
+# Follow the terms of the data you train on.
 #
-# 0. Labels and audio: download/mechol52 (configs/recipes/mechol52.yaml; tools/convert_labels.py labdir).
+# 0. Labels and audio: download/ko_coda (configs/recipes/ko_coda.yaml; tools/convert_labels.py labdir).
 # 1. Preprocess (locally; RMVPE on CPU, one recipe at a time — never in parallel):
-#      python -m preprocess.run --recipe configs/recipes/mechol52.yaml         # -> data/mechol52
+#      python -m preprocess.run --recipe configs/recipes/ko_coda.yaml          # -> data/ko_coda
 #    The shards (shard.npz + metadata.json) are kept in data/<db>/.
 # 2. Teacher (16-step flow, no GAN), then the 1-step student from its pairs:
-#      python -m train --config configs/ko_mechol.yaml --data_dirs <data>/mechol52 \
-#          --run_name ko_mechol_teacher --out_root <log> --device cuda
-#      python -m train --config configs/ko_mechol.yaml --data_dirs (same) --run_name ko_mechol_student \
+#      python -m train --config configs/ko_coda.yaml --data_dirs <data>/ko_coda \
+#          --run_name ko_coda_teacher --out_root <log> --device cuda
+#      python -m train --config configs/ko_coda.yaml --data_dirs (same) --run_name ko_coda_student \
 #          --out_root <log> --device cuda --max_updates 20000 \
-#          --set train.reflow_teacher=<log>/ko_mechol_teacher/ckpt_<best>.pt --set train.reflow_teacher_steps=16 \
+#          --set train.reflow_teacher=<log>/ko_coda_teacher/ckpt_<best>.pt --set train.reflow_teacher_steps=16 \
 #          --set train.num_steps=1 --set train.lr=2.0e-4
 #    configs/ko_teacher.yaml (0.69 h) overfit from about 6k: pick the checkpoint by the eval loss and by ear.
 mel:
@@ -81,10 +80,10 @@ gan:
   enabled: false
 data:
   spk_map:
-    mechol52: 0           # Mechol = 0 in every Korean model (PrettyPitch too)
-  # Two ~1-min pieces are held out (seed 42). The long recording is cut into pieces, so other pieces of the same
+    ko_coda: 0            # speaker 0 in every Korean model (PrettyPitch too)
+  # Two ~1-min pieces are held out (seed 42). Long recordings are cut into pieces, so other pieces of the same
   # song stay in training.
-  eval_dbs: [mechol52]
+  eval_dbs: [ko_coda]
   eval_songs: 2
   min_sec: 0.3
   max_sec: 30
