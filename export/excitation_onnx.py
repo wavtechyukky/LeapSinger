@@ -26,7 +26,10 @@ merely the flow's starting point — details at the inline note on the cumsum be
 
 Noise: white noise is drawn inside the graph via `randn_like` (exports at opset 18), so the
 exported graph needs NO `z` input — matching the [tokens, durations, f0] contract.
-`deterministic=True` zeroes the noise (parity/regression).
+`deterministic=True` zeroes the noise (parity/regression). A host that wants the noise under its
+own control (a seed per phrase: the same input gives the same mel, and re-drawing the noise over a
+span re-takes that span) passes it to `forward(..., noise=...)`; export/cli.py --exc-noise turns
+that into an `exc_noise` graph input.
 """
 from __future__ import annotations
 
@@ -139,10 +142,14 @@ class HarmonicNoiseExcitationONNX(nn.Module):
             acc = acc + a * torch.sin(k * phase) * aa
         return acc
 
-    def forward(self, f0_logf0: torch.Tensor, voiced: torch.Tensor) -> torch.Tensor:
+    def forward(self, f0_logf0: torch.Tensor, voiced: torch.Tensor,
+                noise: torch.Tensor | None = None) -> torch.Tensor:
         """f0_logf0 [B,T] (log2 Hz, CONTINUOUS/gap-less), voiced [B,T] (1=voiced) -> ln-mel [B,n_mels,T].
         For the uv-free / DiffSinger path `voiced` is all-ones; for the optional path it is the
-        real voicing gate. F0 must already be continuous (no unvoiced zeros)."""
+        real voicing gate. F0 must already be continuous (no unvoiced zeros).
+        noise [B, >= T*exc_hop]: standard-normal white noise from the host, used in place of the
+        graph's own draw (the first T*exc_hop samples; a longer buffer is fine). None = draw it
+        here, or zeros when `deterministic`."""
         if f0_logf0.dim() == 1:
             f0_logf0 = f0_logf0[None]
             voiced = voiced[None]
@@ -163,7 +170,10 @@ class HarmonicNoiseExcitationONNX(nn.Module):
         phase = phase.to(f0_logf0.dtype)                                           # back to float32
         harm = self._harm_sum(phase, f0_up)                                        # [B, n]
         harm = (harm / self.harm_rms) * v_up                                       # unit-RMS + voiced gate
-        noise = torch.zeros_like(harm) if self.deterministic else torch.randn_like(harm)
+        if noise is not None:
+            noise = noise[:, :harm.shape[1]].to(harm.dtype)
+        else:
+            noise = torch.zeros_like(harm) if self.deterministic else torch.randn_like(harm)
         exc = self.scale * (harm + self.noise_ratio * noise)                       # [B, n]
         mag = self._stft_mag(exc)                                                  # [B, F, T']
         mel = torch.matmul(self.mel_basis, mag)                                    # [B, n_mels, T']

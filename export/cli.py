@@ -13,6 +13,16 @@ Variants (chosen to match the trained ckpt; the only weight-level split is use_u
 Speaker: none (single-spk) | embed (spk_embed graph input the host feeds) | bake (freeze one
 speaker into the graph; acoustic file becomes {model}.{spk}.onnx).
 
+Optional host inputs (off by default; a graph without them keeps the plain contract above):
+    --exc-noise  `exc_noise` [1, >= 256*T256]: the excitation's white noise (standard normal) comes
+                 from the host instead of the graph. The host seeds it per phrase, so the same input
+                 gives the same mel, and re-drawing it over a span re-takes that span. T256 = frames
+                 on the internal hop-256 grid (2*T for --hop 512); a longer buffer is fine.
+    --x0-gain    `x0_loggain` [1, T]: per-frame ln(gain) applied to the pseudo-mel (the excitation
+                 mel the flow starts from) before the flow; 0 = unchanged. Lets the host shape the
+                 starting level, e.g. a dip before a plosive's release. No retraining: the weights
+                 are the same, only the graph gains the input.
+
 fp32 by default (simple `torch.onnx.export`, the public-release default — none of the fp16
 machinery runs). Pass --fp16 for the ~32% smaller partial-fp16 build (see postprocess.py).
 
@@ -32,7 +42,7 @@ import os
 import torch
 
 from infer import load_acoustic
-from .wrappers import AcousticExportWrapperA, AcousticExportWrapperB
+from .wrappers import AcousticExportWrapperA, AcousticExportWrapperB, by_name
 from . import spk_embed as spk
 from . import postprocess as post
 
@@ -73,15 +83,17 @@ def _validate(cfg, model, variant, speaker, style_id=0):
               "(speaker 0's bank vector is unused; cond gets no speaker term).")
 
 
-def _build_wrapper(model, variant, hop, num_steps, speaker, frozen_spk, style_id=0):
+def _build_wrapper(model, variant, hop, num_steps, speaker, frozen_spk, style_id=0, input_names=None):
+    """The export wrapper. With `input_names` its forward takes exactly those inputs in that order
+    (wrappers.by_name), which the optional inputs need."""
     if variant == "diffsinger":
-        return AcousticExportWrapperA(model, num_steps=num_steps, hop=hop,
-                                      speaker=speaker, frozen_spk=frozen_spk)
-    return AcousticExportWrapperB(model, num_steps=num_steps, speaker=speaker,
-                                  frozen_spk=frozen_spk, style_id=style_id)
+        cls = by_name(AcousticExportWrapperA, input_names) if input_names else AcousticExportWrapperA
+        return cls(model, num_steps=num_steps, hop=hop, speaker=speaker, frozen_spk=frozen_spk)
+    cls = by_name(AcousticExportWrapperB, input_names) if input_names else AcousticExportWrapperB
+    return cls(model, num_steps=num_steps, speaker=speaker, frozen_spk=frozen_spk, style_id=style_id)
 
 
-def _example_and_axes(variant, speaker, hidden, vocab_size):
+def _example_and_axes(variant, speaker, hidden, vocab_size, *, hop=512, exc_noise=False, x0_gain=False):
     """Return (input_names, example_tensors, dynamic_axes) for torch.onnx.export.
     Trace tokens are bounded by vocab_size (a ckpt may have n_phonemes < the current 50)."""
     Np, T = 8, 40
@@ -97,6 +109,12 @@ def _example_and_axes(variant, speaker, hidden, vocab_size):
         names.append("uv"); args.append(torch.ones(1, T)); axes["uv"] = {1: "n_frames"}
     if speaker == "embed":
         names.append("spk_embed"); args.append(torch.zeros(1, hidden))
+    if exc_noise:
+        # the graph slices the samples it needs; the pseudo-512 graph runs on 2*T hop-256 frames
+        t256 = 2 * T if (variant == "diffsinger" and hop == 512) else T
+        names.append("exc_noise"); args.append(torch.randn(1, 256 * t256)); axes["exc_noise"] = {1: "n_samples"}
+    if x0_gain:
+        names.append("x0_loggain"); args.append(torch.zeros(1, T)); axes["x0_loggain"] = {1: "n_frames"}
     return names, tuple(args), axes
 
 
@@ -136,8 +154,15 @@ def main():
     ap.add_argument("--no-harmonic-loop", dest="harmonic_loop", action="store_false")
     ap.add_argument("--deterministic", action="store_true",
                     help="zero the excitation noise (reproducible; for verification, not deployment)")
+    ap.add_argument("--exc-noise", dest="exc_noise", action="store_true", default=False,
+                    help="add an `exc_noise` input [1, >=256*T256]: the excitation's white noise from the host")
+    ap.add_argument("--x0-gain", dest="x0_gain", action="store_true", default=False,
+                    help="add an `x0_loggain` input [1, T]: per-frame ln(gain) on the pseudo-mel (0 = unchanged)")
     ap.add_argument("--verify", action="store_true", help="run ORT parity vs PyTorch after export")
     args = ap.parse_args()
+    if args.exc_noise and args.deterministic:
+        raise SystemExit("--exc-noise and --deterministic exclude each other: with --exc-noise the host "
+                         "supplies the noise (feed zeros for a noise-free run)")
 
     os.makedirs(args.out, exist_ok=True)
     model, cfg = load_acoustic(args.ckpt, device="cpu")
@@ -153,12 +178,12 @@ def main():
     if args.variant == "full" and getattr(model, "style_emb", None) is not None:
         acoustic_file = acoustic_file.replace(".onnx", f".style{args.style_id}.onnx")
 
-    wrapper = _build_wrapper(model, args.variant, args.hop, num_steps,
-                             args.speaker, frozen_spk, args.style_id).eval()
-    wrapper.exc.deterministic = bool(args.deterministic)
-
     input_names, example, axes = _example_and_axes(
-        args.variant, args.speaker, model.hidden, _vocab_size(model))
+        args.variant, args.speaker, model.hidden, _vocab_size(model), hop=args.hop,
+        exc_noise=args.exc_noise, x0_gain=args.x0_gain)
+    wrapper = _build_wrapper(model, args.variant, args.hop, num_steps,
+                             args.speaker, frozen_spk, args.style_id, input_names).eval()
+    wrapper.exc.deterministic = bool(args.deterministic)
 
     fp32_path = os.path.join(args.out, acoustic_file.replace(".onnx", ".fp32.onnx"))
     final_path = os.path.join(args.out, acoustic_file)

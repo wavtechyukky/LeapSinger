@@ -230,6 +230,11 @@ The notebook exports the acoustic model to a single ONNX and runs it end to end 
 
 A style-bearing model (`n_styles` > 0) is exported with `--variant full`, and the style to use is baked into the graph with `--style-id` (default 0) — one ONNX per style.
 
+Two optional inputs give the caller finer control (both off by default; without them the inputs are as above). The weights are the same; nothing is retrained.
+
+- `--exc-noise` — the excitation's white noise (standard normal) comes from the input `exc_noise` ([1, ≥ 256·T256]; T256 = frames on the internal hop-256 grid, 2T with `--hop 512`) instead of being drawn in the graph. Seed it per phrase and the same input gives the same mel every time; regenerate the noise over part of a phrase to re-take just that part.
+- `--x0-gain` — a per-frame ln(gain) from the input `x0_loggain` ([1, T], 0 = unchanged) scales the pseudo-mel (the excitation mel the flow starts from). This allows shaping such as a dip before a plosive's release. The 1-step model does not pass a dip through as is — depending on the phoneme it may, for example, widen the range the dip affects — so set the depth by listening to (or measuring) the output.
+
 As the last post-export pass, the excitation's harmonic sum (a straight-line chain of 256 blocks by default) is folded into a single ONNX `Loop` (`export/harmonic_loop.py`; `--no-harmonic-loop` keeps the unrolled chain). Left unrolled, onnxruntime's default execution order keeps 256 sample-rate arrays alive at once and peak memory reaches 0.28 MB per frame (about 1.5 GB for a 30-second phrase). With the Loop, the 30-second peak drops from +1469 MB to +287 MB, inference is 10–30% faster and session creation is 10× faster. The formula and the order of operations are unchanged, so the output is bit-identical (`--verify` compares against the unrolled form). `Loop` has existed since opset 1 and runs on every runtime, including OpenUTAU's onnxruntime. It can also be applied to an already exported ONNX: `python -m export.harmonic_loop <in.onnx> <out.onnx> --check`
 
 ### Vocoder

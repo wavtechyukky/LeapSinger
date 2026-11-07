@@ -17,6 +17,13 @@ Both swap two things that don't otherwise export:
 
 Contract (hard): sum(durations) == len(f0); this makes the length-regulated cond and the
 excitation the same T.
+
+Two optional inputs, both off unless export/cli.py asks for them:
+  * exc_noise [1, >= 256*T256]: the excitation's white noise, supplied by the host instead of drawn
+    in the graph (T256 = frames on the internal hop-256 grid, i.e. 2*T for the pseudo-512 graph).
+  * x0_loggain [1, T]: per-frame ln(gain) added to the excitation mel before the flow (0 = no change),
+    for shaping the pseudo-mel's level from the host (e.g. dipping it before a plosive's release).
+`by_name()` builds a wrapper whose forward takes whichever inputs the graph has, in order.
 """
 from __future__ import annotations
 
@@ -98,11 +105,15 @@ class _ExportBase(nn.Module):
             cond = cond + self.frozen_spk.view(1, self.hidden, 1)
         return cond
 
-    def _run256(self, tokens, dur256, f0l256, uv256, spk_embed=None):
+    def _run256(self, tokens, dur256, f0l256, uv256, spk_embed=None, exc_noise=None, x0_loggain256=None):
         m = self.model
         cond = self._cond(tokens, dur256, f0l256, uv256, spk_embed)
-        exc = self.exc(f0l256, uv256)                                        # [1,mel,T] ln-mel
+        exc = self.exc(f0l256, uv256, exc_noise)                             # [1,mel,T] ln-mel
         x0 = m.flow._norm(exc)                                               # -> [-1,1]
+        if x0_loggain256 is not None:
+            # ln(gain) on the excitation mel. The normalisation is affine, so adding the slope times
+            # ln(gain) equals scaling the excitation's amplitude by gain.
+            x0 = x0 + x0_loggain256.unsqueeze(1) * (2.0 / (m.flow.vmax - m.flow.vmin))
         mel = m.flow.inference(cond, num_steps=self.num_steps, algorithm="euler", x0_init=x0)
         return mel                                                           # [1,mel,T256]
 
@@ -123,13 +134,14 @@ class AcousticExportWrapperA(_ExportBase):
         assert hop in (256, 512), hop
         self.hop = hop
 
-    def forward(self, tokens, durations, f0, spk_embed=None):
+    def forward(self, tokens, durations, f0, spk_embed=None, exc_noise=None, x0_loggain=None):
         f0l = torch.log2(f0.clamp(min=1.0))                                  # [1,T]
         if self.hop == 512:
             dur256 = durations * 2
             f0l256 = up2_linear(f0l)                       # [1,2T]
             uv256 = torch.ones_like(f0l256)                                  # use_uv=False -> all voiced
-            mel256 = self._run256(tokens, dur256, f0l256, uv256, spk_embed)
+            xg256 = up2_linear(x0_loggain) if x0_loggain is not None else None
+            mel256 = self._run256(tokens, dur256, f0l256, uv256, spk_embed, exc_noise, xg256)
             # hop256 -> hop512: average adjacent frame pairs. A directly-computed hop-512
             # frame centers at the midpoint of the even/odd hop-256 pair, so the pair mean
             # (= linear interp to that midpoint) matches a true hop-512 mel far better than
@@ -139,7 +151,7 @@ class AcousticExportWrapperA(_ExportBase):
             mel = 0.5 * (mel256[:, :, 0::2] + mel256[:, :, 1::2])            # -> hop512 [1,mel,T]
         else:
             uv = torch.ones_like(f0l)
-            mel = self._run256(tokens, durations, f0l, uv, spk_embed)        # [1,mel,T]
+            mel = self._run256(tokens, durations, f0l, uv, spk_embed, exc_noise, x0_loggain)  # [1,mel,T]
         # Emit the [B, T, mel_bins] layout, fed straight to the vocoder (no transpose between
         # acoustic and vocoder).
         return mel.transpose(1, 2)                                           # [1, T, mel_bins]
@@ -156,8 +168,26 @@ class AcousticExportWrapperB(_ExportBase):
                          style_id=style_id)
         self.use_uv = getattr(model, "use_uv", True)
 
-    def forward(self, tokens, durations, f0, uv, spk_embed=None):
+    def forward(self, tokens, durations, f0, uv, spk_embed=None, exc_noise=None, x0_loggain=None):
         f0l = torch.log2(f0.clamp(min=1.0))
         # binarise like training (uv > 0.5) so a soft host flag cannot half-open the harmonic gate
         uv_in = (uv > 0.5).to(f0l.dtype) if self.use_uv else torch.ones_like(f0l)
-        return self._run256(tokens, durations, f0l, uv_in, spk_embed)
+        return self._run256(tokens, durations, f0l, uv_in, spk_embed, exc_noise, x0_loggain)
+
+
+def by_name(wrapper_cls, input_names):
+    """A subclass of `wrapper_cls` whose forward takes the graph inputs positionally in
+    `input_names` order and passes them on by name. torch.onnx.export feeds the example inputs by
+    position, so this lets the optional inputs (uv, spk_embed, exc_noise, x0_loggain) be combined
+    freely. A subclass rather than an outer module, so the node names the post-export passes look
+    for (`/exc/...`) stay the same."""
+    names = tuple(input_names)
+
+    class ByName(wrapper_cls):
+        def forward(self, *inputs):
+            if len(inputs) != len(names):
+                raise TypeError(f"expected {len(names)} inputs {names}, got {len(inputs)}")
+            return super().forward(**dict(zip(names, inputs)))
+
+    ByName.__name__ = f"{wrapper_cls.__name__}ByName"
+    return ByName

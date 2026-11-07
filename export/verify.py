@@ -50,13 +50,21 @@ def _synth_item(Np, seed, vocab=50):
     return tokens, durs, f0
 
 
+def _x0_loggain(T):
+    """A non-zero test curve for the `x0_loggain` input (dips down to ln 0.6), so the parity check
+    exercises that path instead of passing zeros through it."""
+    return (np.log(0.6) * 0.5 * (1.0 - np.cos(np.linspace(0.0, 6.0 * np.pi, T)))).astype(np.float32)[None]
+
+
 def verify_full_graph(wrapper, onnx_path: str, input_names, *, fp16: bool = False,
                       lengths=((1, 24), (7, 40))) -> list:
-    """Run the PyTorch wrapper vs ORT on several lengths. Requires wrapper.exc.deterministic=True
-    for a meaningful MAE; otherwise only shape/finite is trustworthy. Returns per-length dicts."""
+    """Run the PyTorch wrapper vs ORT on several lengths. The MAE is meaningful when the noise is
+    the same on both sides: wrapper.exc.deterministic=True, or an `exc_noise` input (both get the
+    same buffer); otherwise only shape/finite is trustworthy. Inputs go to the wrapper in
+    `input_names` order (the order export/cli.py traced). Returns per-length dicts."""
     import onnxruntime as ort
     sess = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
-    det = bool(getattr(wrapper.exc, "deterministic", False))
+    det = bool(getattr(wrapper.exc, "deterministic", False)) or "exc_noise" in input_names
     variant_full = "uv" in input_names
     speaker_embed = "spk_embed" in input_names
     enc = getattr(wrapper.model, "phoneme_encoder", None)
@@ -73,6 +81,11 @@ def verify_full_graph(wrapper, onnx_path: str, input_names, *, fp16: bool = Fals
         if speaker_embed:
             se = np.zeros((1, wrapper.hidden), np.float32); feeds["spk_embed"] = se
             targs.append(torch.as_tensor(se))
+        if "exc_noise" in input_names:
+            z = np.random.default_rng(seed).standard_normal((1, 512 * T)).astype(np.float32)
+            feeds["exc_noise"] = z; targs.append(torch.as_tensor(z))
+        if "x0_loggain" in input_names:
+            xg = _x0_loggain(T); feeds["x0_loggain"] = xg; targs.append(torch.as_tensor(xg))
         with torch.no_grad():
             tmel = wrapper(*targs)[0].numpy()
         omel = sess.run(None, feeds)[0][0]
@@ -120,6 +133,8 @@ def _ort_feeds(input_names, seed, Np, *, vocab, hidden):
         feeds["spk_embed"] = np.zeros((1, hidden), np.float32)
     if "exc_noise" in input_names:
         feeds["exc_noise"] = np.random.default_rng(seed).standard_normal((1, 512 * T)).astype(np.float32)
+    if "x0_loggain" in input_names:
+        feeds["x0_loggain"] = _x0_loggain(T)
     return feeds, T
 
 
